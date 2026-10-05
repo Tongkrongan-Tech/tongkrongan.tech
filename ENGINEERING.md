@@ -151,7 +151,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Uji lokal 36 pemeriksaan lulus, termasuk aktif otomatis tanpa klik.
 
 ### 2026-10-05, repositori GitHub (agent: Claude Sonnet 5.5)
-- Repo privat https://github.com/azizuzezo/tongkrongan.tech (branch `main`). Rahasia tidak ikut (`.dev.vars`, `.admin-token`, `.wrangler` di-gitignore; sudah dipindai sebelum commit). Tambah README.md.
+- Repo privat https://github.com/xyyxzxx/tongkrongan.tech (branch `main`; dibuat di akun azizuzezo, lalu ditransfer ke xyyxzxx). Rahasia tidak ikut (`.dev.vars`, `.admin-token`, `.wrangler` di-gitignore; sudah dipindai sebelum commit). Tambah README.md.
 - Produksi masih memakai `BASE_DOMAIN=floworks.my.id` sampai domain `tongkrongan.tech` dibeli; langkah pindah ada di SETUP.md bagian 9.
 
 ### Backlog yang disarankan
