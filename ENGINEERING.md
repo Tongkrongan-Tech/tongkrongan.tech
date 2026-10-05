@@ -150,6 +150,10 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Uji live (floworks.my.id): CNAME + TXT dibuat di Cloudflare, verifikasi mengembalikan `platform` (Vercel belum diberi domain), hapus menghapus keduanya (dikonfirmasi di NS resmi `lex.ns.cloudflare.com`; resolver publik masih menampilkan cache ~5 menit). Akun uji sementara di D1 produksi sudah dihapus.
 - Uji lokal 36 pemeriksaan lulus, termasuk aktif otomatis tanpa klik.
 
+### 2026-10-05, repositori GitHub (agent: Claude Sonnet 5.5)
+- Repo privat https://github.com/azizuzezo/tongkrongan.tech (branch `main`). Rahasia tidak ikut (`.dev.vars`, `.admin-token`, `.wrangler` di-gitignore; sudah dipindai sebelum commit). Tambah README.md.
+- Produksi masih memakai `BASE_DOMAIN=floworks.my.id` sampai domain `tongkrongan.tech` dibeli; langkah pindah ada di SETUP.md bagian 9.
+
 ### Backlog yang disarankan
 1. og:image dari logo (logo sudah terpasang di navbar, footer, favicon).
 2. Perbarui PRD.md ke ejaan "tongkrongan".
