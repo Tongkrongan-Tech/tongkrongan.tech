@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tongkrongan",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "tongkrongan", "database_id": "9d395367-7fcf-4cf2-8b9d-d8edeb3f50de", "migrations_dir": "migrations" }
+  ],
+  "workers_dev": true,
+  "routes": [{ "pattern": "floworks.my.id", "custom_domain": true }],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "BASE_DOMAIN": "floworks.my.id",
+    "QUOTA": "3",
+    "DNS_MODE": "live",
+    "TURNSTILE_SITEKEY": "0x4AAAAAAFOTMKmv3k5iVvji"
+  }
+}
