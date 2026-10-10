@@ -5,3 +5,6 @@ BASE_DOMAIN=tongkrongan.tech
 ADMIN_TOKEN=ganti-dengan-string-acak-panjang
 # Opsional: notifikasi ke channel Discord saat user konek Vercel / domain berhasil diklaim.
 # DISCORD_WEBHOOK_URL=
+# Opsional: login Discord (https://discord.com/developers/applications, OAuth2). Redirect: https://<alamat-app>/api/auth/discord/callback
+# DISCORD_CLIENT_ID=
+# DISCORD_CLIENT_SECRET=
