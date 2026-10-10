@@ -170,3 +170,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 ## TXT verifikasi Vercel di domain induk
 - Vercel meminta TXT `_vercel.<domain induk>` bila nama subdomain pernah dipakai di akun Vercel lain. Di form klaim (platform Vercel) ada isian opsional; server membuat TXT itu di `_vercel.tongkrongan.tech` (`txtHost` di worker/dns.ts) memakai kolom `txt_label='_vercel'`, `txt_value`, `txt_record_id` yang sudah ada, sehingga hapus/suspend/edit ikut membersihkannya.
 - Keamanan: nilai wajib `vc-domain-verify=<nama>.<domain>,<kode>` untuk subdomain milik pengguna itu sendiri (divalidasi di server), jadi tidak bisa dipakai untuk membuktikan nama orang lain.
+
+## Verifikasi email dengan OTP
+- Email diaktifkan lewat Resend (`RESEND_API_KEY` secret, `EMAIL_FROM` var, domain terverifikasi) dan `REQUIRE_EMAIL_VERIFY=1`.
+- Daftar baru mengirim kode 6 digit (tabel `email_otps`, migrasi 0004, hash sha256, berlaku 10 menit, maksimal 5 salah, jeda kirim ulang 60 detik) lalu halaman login beralih ke mode `otp`. Login akun yang belum terverifikasi ikut mengirim kode. Endpoint: `POST /api/auth/verify-otp` (sukses = langsung masuk) dan `POST /api/auth/resend-otp`. Tautan lama `GET /api/auth/verify` masih ada tetapi tidak lagi dikirim.

@@ -48,6 +48,16 @@ function csrfGuard(req: Request) {
   if (!origin && req.headers.get('authorization') === null && !(req.headers.get('content-type') ?? '').includes('json')) throw new HttpError(403, 'bad_origin')
 }
 
+// Kirim kode OTP 6 digit ke email. Jeda 60 detik antar kiriman per akun.
+async function issueOtp(env: Env, user: { id: string; email: string }) {
+  const last = await env.DB.prepare('SELECT created_at FROM email_otps WHERE user_id = ?').bind(user.id).first<{ created_at: number }>()
+  if (last && Date.now() - last.created_at < 60_000) return
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0')
+  await env.DB.prepare('INSERT OR REPLACE INTO email_otps (user_id, code_hash, expires_at, attempts, created_at) VALUES (?, ?, ?, 0, ?)')
+    .bind(user.id, await sha256(code), Date.now() + 600_000, Date.now()).run()
+  await sendEmail(env, user.email, `Kode verifikasi Tongkrongan.tech: ${code}`, `<p>Kode verifikasi kamu:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>Berlaku 10 menit. Abaikan email ini bila bukan kamu yang mendaftar.</p>`)
+}
+
 async function historyAdd(env: Env, name: string, key: string, detail?: string) {
   await env.DB.prepare('INSERT INTO history (name, key, detail, at) VALUES (?, ?, ?, ?)').bind(name, key, detail ?? null, Date.now()).run()
 }
@@ -141,8 +151,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     await env.DB.prepare('INSERT INTO users (id, email, pw_hash, pw_salt, provider, verified, verify_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(id, email, await hashPassword(pw, salt), salt, 'email', verified, vtoken, Date.now()).run()
     if (!verified) {
-      const link = `${new URL(req.url).origin}/api/auth/verify?token=${vtoken}`
-      await sendEmail(env, email, 'Verifikasi email Tongkrongan.tech', `<p>Klik untuk memverifikasi email kamu:</p><p><a href="${link}">${link}</a></p>`)
+      await issueOtp(env, { id, email })
       return json({ needVerify: true })
     }
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, id) })
@@ -158,8 +167,35 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16))
     if (!u || !u.pw_hash || !safeEqual(attempt, u.pw_hash)) throw new HttpError(401, 'invalid_credentials')
     if (u.blocked) throw new HttpError(403, 'blocked')
-    if (!u.verified && requireVerify(env)) throw new HttpError(403, 'unverified')
+    if (!u.verified && requireVerify(env)) { await issueOtp(env, { id: u.id, email }); throw new HttpError(403, 'unverified') }
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
+  },
+
+  'POST /api/auth/verify-otp': async (req, env) => {
+    const b = await readBody<{ email?: string; code?: string }>(req)
+    const email = String(b.email ?? '').trim().toLowerCase()
+    const ip = clientIp(req)
+    if (!(await rateLimit(env, `votp:${ip}`, 20, 3600))) throw new HttpError(429, 'rate_limited')
+    const u = await env.DB.prepare('SELECT id, blocked FROM users WHERE email = ?').bind(email).first<{ id: string; blocked: number }>()
+    const o = u ? await env.DB.prepare('SELECT code_hash, expires_at, attempts FROM email_otps WHERE user_id = ?').bind(u.id).first<{ code_hash: string; expires_at: number; attempts: number }>() : null
+    if (!u || !o || o.expires_at < Date.now() || o.attempts >= 5) throw new HttpError(400, 'bad_code')
+    if (!safeEqual(await sha256(String(b.code ?? '').trim()), o.code_hash)) {
+      await env.DB.prepare('UPDATE email_otps SET attempts = attempts + 1 WHERE user_id = ?').bind(u.id).run()
+      throw new HttpError(400, 'bad_code')
+    }
+    if (u.blocked) throw new HttpError(403, 'blocked')
+    await env.DB.prepare('UPDATE users SET verified = 1, verify_token = NULL WHERE id = ?').bind(u.id).run()
+    await env.DB.prepare('DELETE FROM email_otps WHERE user_id = ?').bind(u.id).run()
+    return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
+  },
+
+  'POST /api/auth/resend-otp': async (req, env) => {
+    const b = await readBody<{ email?: string }>(req)
+    const email = String(b.email ?? '').trim().toLowerCase()
+    if (!(await rateLimit(env, `rotp:${clientIp(req)}`, 10, 3600)) || !(await rateLimit(env, `rotp:${email}`, 5, 3600))) throw new HttpError(429, 'rate_limited')
+    const u = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND verified = 0 AND blocked = 0').bind(email).first<{ id: string }>()
+    if (u) await issueOtp(env, { id: u.id, email })
+    return json({ ok: true }) // jawaban sama untuk email apa pun
   },
 
   'POST /api/auth/forgot': async (req, env) => {

@@ -3,17 +3,18 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import { useStore } from '../lib/store'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { Spinner } from '../components/ui'
 import { Turnstile } from '../components/Turnstile'
 
 export function Login() {
   const { t, te, config } = usePrefs()
-  const { login, signup } = useStore()
+  const { login, signup, refresh } = useStore()
   const nav = useNavigate()
   const [qs] = useSearchParams()
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/dashboard'
-  const [mode, setMode] = useState<'in' | 'up' | 'forgot'>('in')
+  const [mode, setMode] = useState<'in' | 'up' | 'forgot' | 'otp'>('in')
+  const [code, setCode] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
@@ -29,33 +30,42 @@ export function Login() {
     e.preventDefault()
     const next: typeof err = {}
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) next.email = t('login.err.email')
-    if (mode !== 'forgot' && pw.length < 8) next.pw = t('login.err.pw')
+    if (mode !== 'forgot' && mode !== 'otp' && pw.length < 8) next.pw = t('login.err.pw')
     setErr(next); setInfo('')
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      if (mode === 'forgot') { await api('/auth/forgot', { body: { email, turnstile: captcha } }); setInfo(t('login.forgot.sent')) }
+      if (mode === 'otp') { await api('/auth/verify-otp', { body: { email, code: code.trim() } }); await refresh(); nav(from, { replace: true }); return }
+      else if (mode === 'forgot') { await api('/auth/forgot', { body: { email, turnstile: captcha } }); setInfo(t('login.forgot.sent')) }
       else if (mode === 'in') { await login(email, pw, captcha); nav(from, { replace: true }) }
       else {
         const r = await signup(email, pw, captcha)
-        if (r.needVerify) { setInfo(t('login.verifySent')); setMode('in') } else nav(from, { replace: true })
+        if (r.needVerify) { setInfo(t('login.otp.sent')); setCode(''); setMode('otp') } else nav(from, { replace: true })
       }
-    } catch (ex) { setErr({ form: te(ex) }) }
+    } catch (ex) {
+      if (mode === 'in' && ex instanceof ApiError && ex.code === 'unverified') { setInfo(t('login.otp.sent')); setCode(''); setMode('otp') }
+      else setErr({ form: te(ex) })
+    }
     // token Turnstile hanya berlaku sekali; muat ulang widget agar percobaan berikutnya tidak ditolak 'captcha'
     setCaptcha(''); setCapKey((k) => k + 1)
     setBusy(false)
+  }
+
+  async function resend() {
+    setErr({}); setInfo('')
+    try { await api('/auth/resend-otp', { body: { email } }); setInfo(t('login.otp.resent')) } catch (ex) { setErr({ form: te(ex) }) }
   }
 
   const oauth = config?.oauth
   return (
     <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-20 md:grid-cols-2">
       <div>
-        <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">{mode === 'in' ? t('login.h.in') : mode === 'up' ? t('login.h.up') : t('login.forgot.h')}</h1>
+        <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">{mode === 'in' ? t('login.h.in') : mode === 'up' ? t('login.h.up') : mode === 'otp' ? t('login.otp.h') : t('login.forgot.h')}</h1>
         <p className="mt-4" style={{ color: 'var(--muted)' }}>{t('login.sub')}</p>
       </div>
       <motion.form onSubmit={submit} noValidate initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card grid gap-5 p-6" style={{ boxShadow: 'var(--shadow)' }}>
         {info && <p role="status" className="rounded-xl border-2 p-3 text-sm font-semibold" style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }}>{info}</p>}
-        {mode !== 'forgot' && (oauth?.github || oauth?.google) && (
+        {mode !== 'forgot' && mode !== 'otp' && (oauth?.github || oauth?.google) && (
           <>
             <div role="group" aria-label={t('login.oauth')} className="grid gap-3 sm:grid-cols-2">
               {oauth.google && <a href="/api/auth/google/start" className="btn">Google</a>}
@@ -66,10 +76,10 @@ export function Login() {
         )}
         <div>
           <label htmlFor="em" className="label">{t('login.email')}</label>
-          <input id="em" type="email" autoComplete="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!err.email} aria-describedby="em-e" />
+          <input id="em" type="email" autoComplete="email" className="field" value={email} readOnly={mode === 'otp'} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!err.email} aria-describedby="em-e" />
           <p id="em-e" aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{err.email}</p>
         </div>
-        {mode !== 'forgot' && (
+        {mode !== 'forgot' && mode !== 'otp' && (
           <div>
             <label htmlFor="pw" className="label">{t('login.pw')}</label>
             <div className="relative">
@@ -80,9 +90,16 @@ export function Login() {
             {mode === 'in' && <button type="button" className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => { setMode('forgot'); setErr({}); setInfo('') }}>{t('login.forgot')}</button>}
           </div>
         )}
-        {config?.turnstileSiteKey && <Turnstile key={capKey} siteKey={config.turnstileSiteKey} onToken={onToken} />}
+        {mode === 'otp' && (
+          <div>
+            <label htmlFor="otp" className="label">{t('login.otp.label')}</label>
+            <input id="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="field text-center text-2xl tracking-[0.5em]" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+            <button type="button" className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => void resend()}>{t('login.otp.resend')}</button>
+          </div>
+        )}
+        {mode !== 'otp' && config?.turnstileSiteKey && <Turnstile key={capKey} siteKey={config.turnstileSiteKey} onToken={onToken} />}
         <p role="alert" className="min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{err.form}</p>
-        <button type="submit" className="btn btn-primary" disabled={busy || (!!config?.turnstileSiteKey && !captcha)}>{busy ? <Spinner /> : mode === 'in' ? t('login.submit.in') : mode === 'up' ? t('login.submit.up') : t('login.forgot.submit')}</button>
+        <button type="submit" className="btn btn-primary" disabled={busy || (mode === 'otp' ? code.length !== 6 : !!config?.turnstileSiteKey && !captcha)}>{busy ? <Spinner /> : mode === 'in' ? t('login.submit.in') : mode === 'up' ? t('login.submit.up') : mode === 'otp' ? t('login.otp.submit') : t('login.forgot.submit')}</button>
         <button type="button" className="cursor-pointer border-0 bg-transparent py-2 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setErr({}); setInfo('') }}>
           {mode === 'in' ? t('login.switch.up') : mode === 'up' ? t('login.switch.in') : t('login.forgot.back')}
         </button>
