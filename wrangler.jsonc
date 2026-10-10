@@ -18,6 +18,7 @@
   "vars": {
     "BASE_DOMAIN": "tongkrongan.tech",
     "EMAIL_FROM": "Tongkrongan <noreply@tongkrongan.tech>",
+    "REQUIRE_EMAIL_VERIFY": "1",
     "QUOTA": "3",
     "DNS_MODE": "live",
     "TURNSTILE_SITEKEY": "0x4AAAAAAFOTMKmv3k5iVvji"
