@@ -19,6 +19,7 @@ export function Login() {
   const [err, setErr] = useState<{ email?: string; pw?: string; form?: string }>({})
   const [info, setInfo] = useState(qs.get('verified') ? t(`login.verified.${qs.get('verified') === '1' ? 1 : 0}`) : qs.get('error') ? t('login.oauthErr') : '')
   const [busy, setBusy] = useState(false)
+  const [capKey, setCapKey] = useState(0)
   const onToken = useCallback((x: string) => setCaptcha(x), [])
   useEffect(() => { document.title = `${t('nav.login')} | Tongkrongan.tech` }, [t])
 
@@ -37,6 +38,8 @@ export function Login() {
         if (r.needVerify) { setInfo(t('login.verifySent')); setMode('in') } else nav(from, { replace: true })
       }
     } catch (ex) { setErr({ form: te(ex) }) }
+    // token Turnstile hanya berlaku sekali; muat ulang widget agar percobaan berikutnya tidak ditolak 'captcha'
+    setCaptcha(''); setCapKey((k) => k + 1)
     setBusy(false)
   }
 
@@ -68,7 +71,7 @@ export function Login() {
           <input id="pw" type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} className="field" value={pw} onChange={(e) => setPw(e.target.value)} aria-invalid={!!err.pw} aria-describedby="pw-e" />
           <p id="pw-e" aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{err.pw}</p>
         </div>
-        {config?.turnstileSiteKey && <Turnstile siteKey={config.turnstileSiteKey} onToken={onToken} />}
+        {config?.turnstileSiteKey && <Turnstile key={capKey} siteKey={config.turnstileSiteKey} onToken={onToken} />}
         <p role="alert" className="min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{err.form}</p>
         <button type="submit" className="btn btn-primary" disabled={busy || (!!config?.turnstileSiteKey && !captcha)}>{busy ? <Spinner /> : mode === 'in' ? t('login.submit.in') : t('login.submit.up')}</button>
         <button type="button" className="cursor-pointer border-0 bg-transparent py-2 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setErr({}); setInfo('') }}>

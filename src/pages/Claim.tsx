@@ -169,7 +169,7 @@ export function Claim() {
                     <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
                       <div>
                         <label htmlFor="txl" className="label">{t('claim.txt.label')}</label>
-                        <input id="txl" className="field" value={txtLabel} onChange={(e) => setTxtLabel(e.target.value)} placeholder="_railway-verify" autoComplete="off" spellCheck={false} aria-invalid={touched && !!txtErr} />
+                        <input id="txl" className="field" value={txtLabel} onChange={(e) => setTxtLabel(e.target.value)} placeholder={platform === 'vercel' ? '_vercel' : '_railway-verify'} autoComplete="off" spellCheck={false} aria-invalid={touched && !!txtErr} />
                       </div>
                       <div>
                         <label htmlFor="txv" className="label">{t('claim.txt.value')}</label>
