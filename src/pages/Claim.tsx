@@ -127,7 +127,7 @@ export function Claim() {
           {step === 1 && (
             <div>
               <h2 className="text-2xl font-bold">{t('claim.s1.h')}</h2>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label={t('claim.s1.h')}>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={t('claim.s1.h')}>
                 {PLATFORMS.map((x, k) => (
                   <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { setPlatform(x.id); setType(x.defaultType); setValues({}) }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
                     <span className="block text-xl font-extrabold">{x.name}</span>

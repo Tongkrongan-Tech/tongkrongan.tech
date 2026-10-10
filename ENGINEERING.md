@@ -74,7 +74,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 | F2 cek nama langsung + saran | Selesai (server memeriksa database) |
 | F3 aturan nama + tercadang | Selesai; daftar merek hanya contoh awal; label domain induk ikut tercadang |
 | F4 A/AAAA/CNAME/TXT | Selesai; satu record utama per subdomain **plus satu TXT tambahan** di `_label.nama.<domain>` (mis. verifikasi Railway) yang dibuat otomatis |
-| F5 kartu platform | Selesai; nilai contoh harus dicek ke dokumentasi resmi platform |
+| F5 kartu platform | Selesai (Cloudflare, Railway, Vercel, GitHub Pages, VPS, hosting lain); nilai contoh harus dicek ke dokumentasi resmi platform |
 | F6 status + alasan + perbaikan | Selesai: `dns`, `http`, `platform`, `down`, `suspended`; cek otomatis di UI |
 | F7 HTTPS | Mengikuti platform tujuan; hanya panduan |
 | F8 dasbor | Selesai |
@@ -153,6 +153,14 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 ### 2026-10-05, repositori GitHub (agent: Claude Sonnet 5.5)
 - Repo privat https://github.com/xyyxzxx/tongkrongan.tech (branch `main`; dibuat di akun azizuzezo, lalu ditransfer ke xyyxzxx). Rahasia tidak ikut (`.dev.vars`, `.admin-token`, `.wrangler` di-gitignore; sudah dipindai sebelum commit). Tambah README.md.
 - Domain `tongkrongan.tech` sudah dibeli; `BASE_DOMAIN` dan route custom domain di wrangler.jsonc, serta SETUP.md, diubah ke `tongkrongan.tech`. Pemilik perlu: tambah zona ke Cloudflare, perbarui secret `CF_API_TOKEN` + `CF_ZONE_ID` untuk zona baru, lalu `npm run deploy`.
+
+### 2026-10-10, penambahan platform GitHub Pages (agent: Udin)
+
+- Menambah platform `github` di `src/lib/dns.ts`: tipe `CNAME` saja, tujuan `username.github.io`, `needsTxt: false`, dokumentasi resmi GitHub Pages. Ditempatkan setelah `vercel` (kelompok static hosting, sebelum `vps`/`hosting`).
+- Karena semua platform didorong dari satu array `PLATFORMS` dan `worker/index.ts` membaca array yang sama, **backend tidak diubah**. `POST /api/subdomains` menerima `platform: "github"` otomatis; tipe di luar daftar platform (`A` untuk github) ditolak `bad_input`.
+- Teks `plat.github.tag` dan `plat.github.s1..s3` ditambahkan di `dict.ts` (ID + EN). `hero.sub` dan `faq.a2` disesuaikan karena menyebut daftar platform secara eksplisit.
+- Penyesuaian tampilan mengikuti jumlah entri: array variasi `borderRadius`/`height` di `Home.tsx` dari 5 ke 6 entri (nilai lama dipertahankan, 1 entri baru disisipkan pada index github), dan grid kartu wizard di `Claim.tsx` dari `lg:grid-cols-5` ke `lg:grid-cols-3` agar 6 kartu menjadi 3+3, bukan 5+1.
+- Verifikasi: `npm run build` lulus (tsc frontend + worker + vite); `node scripts/contrast.mjs` lulus AA; uji lokal mode mock — buat subdomain `platform: "github"` tipe CNAME sukses, `github` + tipe `A` ditolak, platform tak dikenal ditolak.
 
 ### Backlog yang disarankan
 1. og:image dari logo (logo sudah terpasang di navbar, footer, favicon).

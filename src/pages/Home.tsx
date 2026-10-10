@@ -202,7 +202,7 @@ function PlatformSection() {
             <motion.button key={p.id} type="button" role="radio" aria-checked={active} onClick={() => { if (!drag.current.moved) setSel(p) }}
               whileHover={{ y: -6, rotate: k % 2 ? 1 : -1 }} whileTap={{ scale: 0.97 }}
               className="relative min-h-[200px] w-[240px] shrink-0 cursor-pointer snap-start overflow-hidden border-2 p-5 text-left"
-              style={{ borderColor: 'var(--line)', background: p.color, color: '#1b1612', borderRadius: [28, 14, 28, 14, 28][k], boxShadow: active ? '6px 6px 0 var(--line)' : 'none', transform: active ? 'translateY(-4px)' : undefined, height: [230, 200, 260, 220, 240][k] }}>
+              style={{ borderColor: 'var(--line)', background: p.color, color: '#1b1612', borderRadius: [28, 14, 28, 14, 28, 14][k], boxShadow: active ? '6px 6px 0 var(--line)' : 'none', transform: active ? 'translateY(-4px)' : undefined, height: [230, 200, 260, 220, 240, 210][k] }}>
               <span className="text-2xl font-extrabold">{p.name}</span>
               <span className="mt-2 block text-sm font-medium">{t(`plat.${p.id}.tag`)}</span>
               <span className="absolute bottom-4 left-5 flex gap-1.5">{p.types.map((ty) => <span key={ty} className="rounded-md border-2 px-2 py-0.5 text-xs font-bold" style={{ borderColor: '#1b1612' }}>{ty}</span>)}</span>
