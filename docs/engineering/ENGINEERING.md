@@ -1,10 +1,10 @@
 # ENGINEERING.md
 
-Catatan teknis dan log perubahan. **Setiap agent/developer wajib membaca file ini sebelum mulai, dan menambah entri di "Log Perubahan" setelah selesai.** Sumber kebutuhan: [PRD.md](PRD.md).
+Catatan teknis dan log perubahan. **Setiap agent/developer wajib membaca file ini sebelum mulai, dan menambah entri di "Log Perubahan" setelah selesai.** Sumber kebutuhan: [PRD.md](../product/PRD.md).
 
 ## Status saat ini (2026-10-05)
 
-Aplikasi **berbasis API sungguhan**: frontend React + backend Cloudflare Worker + database D1. Mode demo sudah **dihapus**. Alur lokal (`DNS_MODE=mock`) lulus 35 pemeriksaan browser. **Jalur live belum pernah dites dengan kredensial asli** (API Cloudflare DNS, DoH, verifikasi HTTP, Cron di produksi, OAuth, Resend, Safe Browsing; verifikasi **sukses** dengan platform sungguhan): uji dengan daftar di [SETUP.md](SETUP.md) bagian 6 setelah deploy. Panduan go-live: [SETUP.md](SETUP.md).
+Aplikasi **berbasis API sungguhan**: frontend React + backend Cloudflare Worker + database D1. Mode demo sudah **dihapus**. Alur lokal (`DNS_MODE=mock`) lulus 35 pemeriksaan browser. **Jalur live belum pernah dites dengan kredensial asli** (API Cloudflare DNS, DoH, verifikasi HTTP, Cron di produksi, OAuth, Resend, Safe Browsing; verifikasi **sukses** dengan platform sungguhan): uji dengan daftar di [SETUP.md](../ops/SETUP.md) bagian 6 setelah deploy. Panduan go-live: [SETUP.md](../ops/SETUP.md).
 
 ## Cara menjalankan (lokal)
 
@@ -58,11 +58,12 @@ worker/
 migrations/0001_init.sql  skema D1
 wrangler.jsonc          konfigurasi Worker, D1, Cron, vars
 scripts/contrast.mjs    pemeriksa kontras per tema
+docs/                   dokumentasi (product, engineering, ops)
 ```
 
 ## API (semua JSON, prefiks /api)
 
-`GET config` · `GET check?name=` · `GET auth/me` · `POST auth/signup|login|logout` · `GET auth/verify?token=` · `GET auth/github|google/start|callback` · `GET|POST subdomains` · `PATCH|DELETE subdomains/:name` · `POST subdomains/:name/verify` · `POST reports` · admin (Bearer `ADMIN_TOKEN`): `GET admin/reports`, `POST admin/reports/:id/resolve`, `POST admin/suspend`, `POST admin/block`.
+`GET config`, `GET check?name=`, `GET auth/me`, `POST auth/signup|login|logout`, `GET auth/verify?token=`, `GET auth/github|google/start|callback`, `GET|POST subdomains`, `PATCH|DELETE subdomains/:name`, `POST subdomains/:name/verify`, `POST reports`, admin (Bearer `ADMIN_TOKEN`): `GET admin/reports`, `POST admin/reports/:id/resolve`, `POST admin/suspend`, `POST admin/block`.
 
 Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 10/15 menit/IP+email, perubahan DNS 20/jam/akun, lapor 5/jam/IP, verifikasi minimal 8 detik per subdomain.
 
@@ -130,7 +131,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Verifikasi kepemilikan diganti dari kotak centang TXT ke berkas token HTTP + cek DNS via DoH.
 - Frontend: `api.ts`, store berbasis API, NameChecker memanggil `/api/check`, Claim membuat record saat langkah 3, Dashboard/Login/Report memakai API, komponen Turnstile, pesan galat API ramah (`te()`).
 - Perbaikan: pelindung CSRF menolak permintaan lewat proxy dev (Host/Origin tidak sama), diatasi `changeOrigin` + header origin di vite.config.ts.
-- Dokumen baru: [SETUP.md](SETUP.md).
+- Dokumen baru: [SETUP.md](../ops/SETUP.md).
 
 ### 2026-10-05, provisioning Cloudflare (agent: Claude Sonnet 5.5)
 - Login wrangler oleh pemilik; dibuat D1 `tongkrongan` (id di wrangler.jsonc), migrasi 0001 diterapkan di produksi, secret `ADMIN_TOKEN` acak diunggah (salinan lokal di `.admin-token`, gitignored).
@@ -160,7 +161,12 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Karena semua platform didorong dari satu array `PLATFORMS` dan `worker/index.ts` membaca array yang sama, **backend tidak diubah**. `POST /api/subdomains` menerima `platform: "github"` otomatis; tipe di luar daftar platform (`A` untuk github) ditolak `bad_input`.
 - Teks `plat.github.tag` dan `plat.github.s1..s3` ditambahkan di `dict.ts` (ID + EN). `hero.sub` dan `faq.a2` disesuaikan karena menyebut daftar platform secara eksplisit.
 - Penyesuaian tampilan mengikuti jumlah entri: array variasi `borderRadius`/`height` di `Home.tsx` dari 5 ke 6 entri (nilai lama dipertahankan, 1 entri baru disisipkan pada index github), dan grid kartu wizard di `Claim.tsx` dari `lg:grid-cols-5` ke `lg:grid-cols-3` agar 6 kartu menjadi 3+3, bukan 5+1.
-- Verifikasi: `npm run build` lulus (tsc frontend + worker + vite); `node scripts/contrast.mjs` lulus AA; uji lokal mode mock — buat subdomain `platform: "github"` tipe CNAME sukses, `github` + tipe `A` ditolak, platform tak dikenal ditolak.
+- Verifikasi: `npm run build` lulus (tsc frontend + worker + vite); `node scripts/contrast.mjs` lulus AA; uji lokal mode mock, buat subdomain `platform: "github"` tipe CNAME sukses, `github` + tipe `A` ditolak, platform tak dikenal ditolak.
+
+### 2026-10-11, rapikan repositori komunitas (agent: opencode)
+- Menambah berkas komunitas: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, LICENSE (MIT), dan .env.example; .gitignore menutup .env.
+- Menambah .github: template issue (bug, permintaan fitur, pertanyaan), template PR, CODEOWNERS, workflow CI (build + pemeriksa kontras), dan Dependabot.
+- Memindahkan dokumentasi ke `docs/`: `docs/product/PRD.md`, `docs/engineering/ENGINEERING.md` (berkas ini), dan `docs/ops/SETUP.md`; tautan antar-dokumen disesuaikan.
 
 ### 2026-10-11, notifikasi Discord (agent: Claude Sonnet 5.5)
 

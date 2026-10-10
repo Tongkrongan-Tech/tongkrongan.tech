@@ -1,6 +1,6 @@
-# PRD — tongrongan.tech: Subdomain Gratis untuk Semua Orang
+# PRD: tongrongan.tech, Subdomain Gratis untuk Semua Orang
 
-Oct 5, 2026 · @Abdul Aziz
+Oct 5, 2026, @Abdul Aziz
 
 ## Ringkasan Eksekutif
 
@@ -73,7 +73,7 @@ Versi 1 fokus pada satu hal: klaim subdomain gratis yang andal dan mudah disambu
 
 ## User Journey
 
-&#91;embedded content: user journey · 7 langkah, 1 keputusan\]
+[embedded content: user journey, 7 langkah, 1 keputusan]
 
 Pencarian nama terbuka tanpa login; akun baru diminta saat klaim. Jika verifikasi DNS gagal, sistem menjelaskan penyebabnya dan pengguna mengulang dari langkah isi record.
 
@@ -152,7 +152,7 @@ Seluruh tampilan harus terasa hidup, tetapi tetap cepat dan bisa dipakai semua o
 
 ## Arsitektur Teknis dan Stack
 
-&#91;embedded content: arsitektur · 6 komponen\]
+[embedded content: arsitektur, 6 komponen]
 
 API backend menulis record ke zona tongrongan.tech lewat API Cloudflare DNS dan menyimpan status di database. Worker memeriksa propagasi DNS dan respons HTTP tujuan, lalu memperbarui status. Pengunjung website tidak melewati aplikasi kami: DNS langsung mengarahkan mereka ke platform milik pengguna.
 
@@ -216,7 +216,7 @@ Layanan inti gratis selamanya. Biaya utama sangat kecil (domain tahunan, infrast
 
 ## Roadmap, Risiko, dan Pertanyaan Terbuka
 
-&#91;embedded content: roadmap · 4 fase, 3 gerbang\]
+[embedded content: roadmap, 4 fase, 3 gerbang]
 
 Fase belum diberi tanggal karena tim dan sumber daya belum ditetapkan; setiap gerbang harus lulus sebelum fase berikutnya dimulai.
 

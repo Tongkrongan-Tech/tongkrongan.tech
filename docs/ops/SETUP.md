@@ -36,7 +36,7 @@ npx wrangler login            # buka browser, izinkan akses
 npx wrangler d1 create tongkrongan
 ```
 
-Salin `database_id` dari keluaran perintah terakhir ke [wrangler.jsonc](wrangler.jsonc) (ganti `GANTI-DENGAN-ID-DARI-wrangler-d1-create`).
+Salin `database_id` dari keluaran perintah terakhir ke [wrangler.jsonc](../../wrangler.jsonc) (ganti `GANTI-DENGAN-ID-DARI-wrangler-d1-create`).
 
 Cek juga `vars` di wrangler.jsonc: `BASE_DOMAIN` = domain induk, `QUOTA` = kuota per akun, `DNS_MODE` harus `live` untuk produksi.
 
