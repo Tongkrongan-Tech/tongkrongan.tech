@@ -162,3 +162,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 5. UI admin, F11 (pengingat email), F13 (token API), 2FA, pembekuan record saat takeover terdeteksi, batas per perangkat.
 6. Alamat kontak abuse resmi (Email Routing) lalu tampilkan di halaman lapor.
 7. Audit Lighthouse dan uji pembaca layar.
+
+## Reset kata sandi dan tampil/sembunyi sandi
+- Tabel `password_resets` (migrasi 0003), endpoint `POST /api/auth/forgot` (selalu menjawab ok agar email tidak bisa ditebak) dan `POST /api/auth/reset` (token sekali pakai, berlaku 1 jam, semua sesi akun dihapus). Halaman `/reset`, mode "lupa sandi" di halaman login, tombol Lihat/Sembunyi di kolom sandi.
+- Butuh `RESEND_API_KEY` dan `EMAIL_FROM`. Bila belum diset, `/forgot` menjawab 503 `email_off`.

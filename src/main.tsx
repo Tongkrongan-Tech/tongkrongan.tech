@@ -10,6 +10,7 @@ import { Home } from './pages/Home'
 import { Claim } from './pages/Claim'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
+import { ResetPassword } from './pages/ResetPassword'
 import { Report } from './pages/Report'
 import { NotFound } from './pages/NotFound'
 
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="claim" element={<Claim />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="login" element={<Login />} />
+                <Route path="reset" element={<ResetPassword />} />
                 <Route path="report" element={<Report />} />
                 <Route path="*" element={<NotFound />} />
               </Route>

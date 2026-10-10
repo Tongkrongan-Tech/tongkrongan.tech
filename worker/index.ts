@@ -160,6 +160,40 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
   },
 
+  'POST /api/auth/forgot': async (req, env) => {
+    const b = await readBody<{ email?: string; turnstile?: string }>(req)
+    const email = String(b.email ?? '').trim().toLowerCase()
+    const ip = clientIp(req)
+    if (!(await rateLimit(env, `forgot:${ip}`, 5, 3600))) throw new HttpError(429, 'rate_limited')
+    if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
+    if (!env.RESEND_API_KEY || !env.EMAIL_FROM) throw new HttpError(503, 'email_off')
+    const u = EMAIL_RE.test(email) ? await env.DB.prepare('SELECT id FROM users WHERE email = ? AND pw_hash IS NOT NULL AND blocked = 0').bind(email).first<{ id: string }>() : null
+    if (u) {
+      const token = randomHex(24)
+      await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(u.id).run()
+      await env.DB.prepare('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)').bind(await sha256(token), u.id, Date.now() + 3600_000).run()
+      const link = `${new URL(req.url).origin}/reset?token=${token}`
+      await sendEmail(env, email, 'Atur ulang kata sandi Tongkrongan.tech', `<p>Klik untuk mengatur ulang kata sandi kamu (berlaku 1 jam):</p><p><a href="${link}">${link}</a></p><p>Abaikan email ini bila bukan kamu yang meminta.</p>`)
+    }
+    return json({ ok: true }) // jawaban sama untuk email terdaftar maupun tidak
+  },
+
+  'POST /api/auth/reset': async (req, env) => {
+    const b = await readBody<{ token?: string; password?: string }>(req)
+    const ip = clientIp(req)
+    if (!(await rateLimit(env, `reset:${ip}`, 10, 3600))) throw new HttpError(429, 'rate_limited')
+    const pw = String(b.password ?? '')
+    if (pw.length < 8 || pw.length > 128) throw new HttpError(422, 'password')
+    const th = await sha256(String(b.token ?? ''))
+    const r = await env.DB.prepare('SELECT user_id, expires_at FROM password_resets WHERE token_hash = ?').bind(th).first<{ user_id: string; expires_at: number }>()
+    if (!r || r.expires_at < Date.now()) throw new HttpError(400, 'bad_token')
+    const salt = randomHex(16)
+    await env.DB.prepare('UPDATE users SET pw_hash = ?, pw_salt = ? WHERE id = ?').bind(await hashPassword(pw, salt), salt, r.user_id).run()
+    await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(r.user_id).run()
+    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(r.user_id).run()
+    return json({ ok: true })
+  },
+
   'POST /api/auth/logout': async (req, env) => {
     const t = readCookie(req, 'tt_session')
     if (t) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(t)).run()
