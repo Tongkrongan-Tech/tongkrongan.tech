@@ -50,7 +50,7 @@ Satu Worker Cloudflare menyajikan frontend dan API. Saat pengguna mengklaim nama
 - migrations/ skema dan perubahan database D1.
 - scripts/ skrip pendukung, termasuk pemeriksa kontras warna.
 - public/ aset statis dan logo.
-- PRD.md, ENGINEERING.md, dan SETUP.md dokumen produk dan teknis.
+- docs/ dokumentasi: product (PRD), engineering (keputusan teknis dan log), dan ops (panduan setup).
 
 ## Menjalankan di lokal
 
@@ -90,7 +90,7 @@ Rahasia tidak pernah masuk ke repositori. Untuk lokal, isi .dev.vars yang sudah 
 - VERCEL_CLIENT_ID, VERCEL_CLIENT_SECRET, VERCEL_INTEGRATION_SLUG, dan VERCEL_TOKEN_KEY: sambungan Vercel (opsional).
 - SAFE_BROWSING_KEY: pemeriksaan daftar ancaman (opsional).
 
-Langkah lengkap ada di SETUP.md.
+Langkah lengkap ada di docs/ops/SETUP.md.
 
 ## Perintah npm
 
@@ -108,9 +108,10 @@ Pemeriksa kontras dijalankan dengan node scripts/contrast.mjs. Perintah ini mema
 
 ## Dokumentasi
 
-- PRD.md: kebutuhan produk dan ruang lingkup versi pertama.
-- ENGINEERING.md: keputusan teknis, struktur, status, dan log perubahan. Baca sebelum mengerjakan.
-- SETUP.md: langkah dari kode ke layanan live.
+- docs/product/PRD.md: kebutuhan produk dan ruang lingkup versi pertama.
+- docs/engineering/ENGINEERING.md: keputusan teknis, struktur, status, dan log perubahan. Baca sebelum mengerjakan.
+- docs/ops/SETUP.md: langkah dari kode ke layanan live.
+- docs/README.md: indeks dokumentasi.
 
 ## Kontribusi
 
