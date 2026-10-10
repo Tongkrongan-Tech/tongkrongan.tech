@@ -23,6 +23,8 @@ export interface Env {
   GITHUB_CLIENT_SECRET?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
+  DISCORD_CLIENT_ID?: string
+  DISCORD_CLIENT_SECRET?: string
 }
 
 export class HttpError extends Error {
@@ -73,6 +75,18 @@ export async function rateLimit(env: Env, key: string, limit: number, windowSec:
   const row = await env.DB.prepare('INSERT INTO rate_limits (k, w, n) VALUES (?, ?, 1) ON CONFLICT(k, w) DO UPDATE SET n = n + 1 RETURNING n').bind(key, w).first<{ n: number }>()
   await env.DB.prepare('DELETE FROM rate_limits WHERE w < ?').bind(w - 2).run()
   return (row?.n ?? 0) <= limit
+}
+
+// Baca hitungan tanpa menambah. Dipakai untuk cek kuncian tanpa ikut menambahnya.
+export async function ratePeek(env: Env, key: string, windowSec: number): Promise<number> {
+  const w = Math.floor(Date.now() / 1000 / windowSec)
+  const row = await env.DB.prepare('SELECT n FROM rate_limits WHERE k = ? AND w = ?').bind(key, w).first<{ n: number }>()
+  return row?.n ?? 0
+}
+
+// Hapus hitungan (mis. saat login berhasil, kuncian dibuka).
+export async function rateClear(env: Env, key: string) {
+  await env.DB.prepare('DELETE FROM rate_limits WHERE k = ?').bind(key).run()
 }
 
 export async function verifyTurnstile(env: Env, token: string | undefined, ip: string) {

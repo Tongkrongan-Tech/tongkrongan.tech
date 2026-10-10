@@ -1,11 +1,12 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
 import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
-import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
+import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
 import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
 
-const SESSION_DAYS = 30
+const SESSION_DAYS = 14
+const MAX_BODY = 65536
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
 const REASONS = ['phishing', 'malware', 'spam', 'illegal', 'impersonation', 'other']
 const TYPES: RecordType[] = ['A', 'AAAA', 'CNAME', 'TXT']
@@ -19,6 +20,17 @@ const SECURITY_HEADERS: Record<string, string> = {
   'content-security-policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com",
 }
 
+// RFC 9116. Perbarui Expires sebelum kedaluwarsa.
+const SECURITY_TXT = [
+  'Contact: mailto:halo@tongkrongan.tech',
+  'Expires: 2027-10-11T00:00:00.000Z',
+  'Preferred-Languages: id, en',
+  'Canonical: https://tongkrongan.tech/.well-known/security.txt',
+  'Policy: https://github.com/xyyxzxx/tongkrongan.tech/blob/main/SECURITY.md',
+  '',
+].join('\n')
+
+type OAuthProvider = 'github' | 'google' | 'discord'
 type User = { id: string; email: string; provider: string }
 type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
 
@@ -27,12 +39,18 @@ const quota = (env: Env) => Number(env.QUOTA) || 3
 const requireVerify = (env: Env) => env.REQUIRE_EMAIL_VERIFY === '1' && !!env.RESEND_API_KEY && !!env.EMAIL_FROM
 const reservedExtra = (env: Env) => [env.BASE_DOMAIN.split('.')[0]]
 
+// Nama cookie sesi: pakai prefix __Host- di HTTPS (wajib Secure + Path=/ + tanpa Domain), dan nama biasa di lokal (HTTP).
+const sessionName = (req: Request) => new URL(req.url).protocol === 'https:' ? '__Host-tt_session' : 'tt_session'
+const readSession = (req: Request) => readCookie(req, '__Host-tt_session') ?? readCookie(req, 'tt_session')
+
 async function readBody<T>(req: Request): Promise<T> {
-  try { return (await req.json()) as T } catch { throw new HttpError(400, 'bad_json') }
+  const text = await req.text()
+  if (text.length > MAX_BODY) throw new HttpError(413, 'bad_input')
+  try { return JSON.parse(text) as T } catch { throw new HttpError(400, 'bad_json') }
 }
 
 async function currentUser(req: Request, env: Env): Promise<User | null> {
-  const t = readCookie(req, 'tt_session')
+  const t = readSession(req)
   if (!t) return null
   const row = await env.DB.prepare(
     'SELECT u.id, u.email, u.provider FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.blocked = 0',
@@ -45,11 +63,21 @@ async function requireUser(req: Request, env: Env) {
   return u
 }
 
+// Buat sesi baru. Rotasi: hapus sesi lama dari cookie yang sedang dipakai agar tidak ada session fixation.
 async function startSession(req: Request, env: Env, userId: string) {
+  const old = readSession(req)
+  if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(old)).run()
   const token = randomHex(32)
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
     .bind(await sha256(token), userId, Date.now() + SESSION_DAYS * 864e5).run()
-  return cookie(req, 'tt_session', token, SESSION_DAYS * 86400)
+  return cookie(req, sessionName(req), token, SESSION_DAYS * 86400)
+}
+
+function clearSessionCookies(req: Request, data: unknown): Response {
+  const headers = new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+  headers.append('set-cookie', cookie(req, 'tt_session', '', 0))
+  headers.append('set-cookie', cookie(req, '__Host-tt_session', '', 0))
+  return new Response(JSON.stringify(data), { status: 200, headers })
 }
 
 function csrfGuard(req: Request) {
@@ -146,7 +174,7 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
 const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Promise<Response>> = {
   'GET /api/config': async (_r, env) => json({
     baseDomain: env.BASE_DOMAIN, quota: quota(env),
-    oauth: { github: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) },
+    oauth: { github: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET), discord: !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET) },
     turnstileSiteKey: env.TURNSTILE_SECRET && env.TURNSTILE_SITEKEY ? env.TURNSTILE_SITEKEY : null,
     emailVerify: requireVerify(env), vercelConnect: vercelEnabled(env), mock: env.DNS_MODE !== 'live',
   }),
@@ -207,13 +235,19 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const email = String(b.email ?? '').trim().toLowerCase()
     const ip = clientIp(req)
     if (!(await rateLimit(env, `login:${ip}:${email}`, 10, 900))) throw new HttpError(429, 'rate_limited')
+    // Kuncian akun: setelah 10 kegagalan per email dalam 15 menit, login ditolak sementara (walau sandi benar).
+    if (await ratePeek(env, `lock:${email}`, 900) >= 10) throw new HttpError(429, 'rate_limited')
     if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
     const u = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first<{ id: string; pw_hash: string | null; pw_salt: string | null; verified: number; blocked: number }>()
     const stored = u?.pw_hash ? parsePasswordHash(u.pw_hash) : null
     const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16), stored?.iterations ?? PBKDF2_ITERATIONS)
-    if (!u || !u.pw_hash || !stored || !safeEqual(attempt.slice(attempt.indexOf('$') + 1), stored.hash)) throw new HttpError(401, 'invalid_credentials')
+    if (!u || !u.pw_hash || !stored || !safeEqual(attempt.slice(attempt.indexOf('$') + 1), stored.hash)) {
+      await rateLimit(env, `lock:${email}`, 10, 900)
+      throw new HttpError(401, 'invalid_credentials')
+    }
     if (u.blocked) throw new HttpError(403, 'blocked')
     if (!u.verified && requireVerify(env)) { await issueOtp(env, { id: u.id, email }); throw new HttpError(403, 'unverified') }
+    await rateClear(env, `lock:${email}`)
     // Naikkan iterasi hash lama ke standar terbaru saat login berhasil.
     if (stored.iterations < PBKDF2_ITERATIONS && u.pw_salt) {
       await env.DB.prepare('UPDATE users SET pw_hash = ? WHERE id = ?').bind(await hashPassword(String(b.password ?? ''), u.pw_salt), u.id).run()
@@ -236,6 +270,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (u.blocked) throw new HttpError(403, 'blocked')
     await env.DB.prepare('UPDATE users SET verified = 1 WHERE id = ?').bind(u.id).run()
     await env.DB.prepare('DELETE FROM email_otps WHERE user_id = ?').bind(u.id).run()
+    await rateClear(env, `lock:${email}`)
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
   },
 
@@ -368,9 +403,9 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
   },
 
   'POST /api/auth/logout': async (req, env) => {
-    const t = readCookie(req, 'tt_session')
+    const t = readSession(req)
     if (t) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(t)).run()
-    return json({ ok: true }, 200, { 'set-cookie': cookie(req, 'tt_session', '', 0) })
+    return clearSessionCookies(req, { ok: true })
   },
 
   'GET /api/subdomains': async (req, env) => {
@@ -497,20 +532,27 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
   throw new HttpError(404, 'not_found')
 }
 
-/* ---------- OAuth ---------- */
-async function oauthStart(req: Request, env: Env, url: URL, provider: 'github' | 'google') {
-  const id = provider === 'github' ? env.GITHUB_CLIENT_ID : env.GOOGLE_CLIENT_ID
-  const sec = provider === 'github' ? env.GITHUB_CLIENT_SECRET : env.GOOGLE_CLIENT_SECRET
-  if (!id || !sec) throw new HttpError(404, 'not_configured')
+/* ---------- OAuth (GitHub, Google, Discord) ---------- */
+function oauthCreds(env: Env, provider: OAuthProvider): { id?: string; secret?: string } {
+  if (provider === 'github') return { id: env.GITHUB_CLIENT_ID, secret: env.GITHUB_CLIENT_SECRET }
+  if (provider === 'google') return { id: env.GOOGLE_CLIENT_ID, secret: env.GOOGLE_CLIENT_SECRET }
+  return { id: env.DISCORD_CLIENT_ID, secret: env.DISCORD_CLIENT_SECRET }
+}
+
+async function oauthStart(req: Request, env: Env, url: URL, provider: OAuthProvider) {
+  const { id, secret } = oauthCreds(env, provider)
+  if (!id || !secret) throw new HttpError(404, 'not_configured')
   const state = randomHex(16)
   const redirect = `${url.origin}/api/auth/${provider}/callback`
   const dest = provider === 'github'
     ? `https://github.com/login/oauth/authorize?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&scope=${encodeURIComponent('user:email')}&state=${state}`
-    : `https://accounts.google.com/o/oauth2/v2/auth?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent('openid email')}&state=${state}`
+    : provider === 'google'
+      ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent('openid email')}&state=${state}`
+      : `https://discord.com/oauth2/authorize?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent('identify email')}&state=${state}`
   return new Response(null, { status: 302, headers: { location: dest, 'set-cookie': cookie(req, 'tt_oauth', state, 600) } })
 }
 
-async function oauthCallback(req: Request, env: Env, url: URL, provider: 'github' | 'google') {
+async function oauthCallback(req: Request, env: Env, url: URL, provider: OAuthProvider) {
   const state = url.searchParams.get('state'), code = url.searchParams.get('code')
   const fail = (why: string) => Response.redirect(`${url.origin}/login?error=${why}`, 302)
   if (!state || !code || state !== readCookie(req, 'tt_oauth')) return fail('state')
@@ -524,13 +566,20 @@ async function oauthCallback(req: Request, env: Env, url: URL, provider: 'github
       const er = await fetch('https://api.github.com/user/emails', { headers: { authorization: `Bearer ${access_token}`, 'user-agent': 'tongkrongan' } })
       const list = (await er.json()) as { email: string; primary: boolean; verified: boolean }[]
       email = list.find((e) => e.primary && e.verified)?.email ?? null
-    } else {
+    } else if (provider === 'google') {
       const tr = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID!, client_secret: env.GOOGLE_CLIENT_SECRET!, code, redirect_uri: redirect, grant_type: 'authorization_code' }) })
       const { access_token } = (await tr.json()) as { access_token?: string }
       if (!access_token) return fail('token')
       const ur = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: `Bearer ${access_token}` } })
       const info = (await ur.json()) as { email?: string; email_verified?: boolean }
       email = info.email_verified ? info.email ?? null : null
+    } else {
+      const tr = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID!, client_secret: env.DISCORD_CLIENT_SECRET!, grant_type: 'authorization_code', code, redirect_uri: redirect }) })
+      const { access_token } = (await tr.json()) as { access_token?: string }
+      if (!access_token) return fail('token')
+      const ur = await fetch('https://discord.com/api/users/@me', { headers: { authorization: `Bearer ${access_token}` } })
+      const info = (await ur.json()) as { email?: string; verified?: boolean }
+      email = info.verified === false ? null : info.email ?? null
     }
   } catch { return fail('provider') }
   if (!email) return fail('email')
@@ -562,11 +611,14 @@ function match(method: string, path: string) {
 
 async function handleFetch(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url)
+  if (url.pathname === '/.well-known/security.txt') {
+    return new Response(SECURITY_TXT, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } })
+  }
   if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req)
   try {
     csrfGuard(req)
-    const oauth = url.pathname.match(/^\/api\/auth\/(github|google)\/(start|callback)$/)
-    if (oauth && req.method === 'GET') return oauth[2] === 'start' ? await oauthStart(req, env, url, oauth[1] as 'github') : await oauthCallback(req, env, url, oauth[1] as 'github')
+    const oauth = url.pathname.match(/^\/api\/auth\/(github|google|discord)\/(start|callback)$/)
+    if (oauth && req.method === 'GET') return oauth[2] === 'start' ? await oauthStart(req, env, url, oauth[1] as OAuthProvider) : await oauthCallback(req, env, url, oauth[1] as OAuthProvider)
     const adm = await admin(req, env, url)
     if (adm) return adm
     const hit = match(req.method, url.pathname)
@@ -579,13 +631,21 @@ async function handleFetch(req: Request, env: Env): Promise<Response> {
   }
 }
 
+// Tambah header keamanan ke semua respons, sambil memastikan set-cookie tidak hilang.
+function harden(res: Response, req: Request): Response {
+  const headers = new Headers()
+  res.headers.forEach((v, k) => { if (k.toLowerCase() !== 'set-cookie') headers.set(k, v) })
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!headers.has(k)) headers.set(k, v)
+  if (new URL(req.url).protocol === 'https:') headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains')
+  const out = new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+  for (const c of setCookies) out.headers.append('set-cookie', c)
+  return out
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const res = await handleFetch(req, env)
-    const headers = new Headers(res.headers)
-    for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!headers.has(k)) headers.set(k, v)
-    if (new URL(req.url).protocol === 'https:') headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains')
-    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+    return harden(await handleFetch(req, env), req)
   },
   async scheduled(_c: ScheduledController, env: Env) { await runCron(env) },
 }
