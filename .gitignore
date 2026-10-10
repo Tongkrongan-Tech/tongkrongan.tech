@@ -4,3 +4,6 @@ dist
 .wrangler
 .admin-token
 vercel-assets/
+.env
+.env.*
+!.env.example
