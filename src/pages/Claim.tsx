@@ -163,22 +163,6 @@ export function Claim() {
                     </div>
                     {p.placeholder[type] && <button type="button" className="mt-1 cursor-pointer border-0 bg-transparent p-0 py-2 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => setValue(p.placeholder[type]!)}>{t('claim.useExample')}</button>}
                   </div>
-                  <details open={p.needsTxt || !!txtLabel} className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)' }}>
-                    <summary className="cursor-pointer text-sm font-bold">{t('claim.txt.h')}</summary>
-                    <p className="hint mt-2">{t('claim.txt.hint')}</p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
-                      <div>
-                        <label htmlFor="txl" className="label">{t('claim.txt.label')}</label>
-                        <input id="txl" className="field" value={txtLabel} onChange={(e) => setTxtLabel(e.target.value)} placeholder="_railway-verify" autoComplete="off" spellCheck={false} aria-invalid={touched && !!txtErr} />
-                      </div>
-                      <div>
-                        <label htmlFor="txv" className="label">{t('claim.txt.value')}</label>
-                        <input id="txv" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} autoComplete="off" spellCheck={false} aria-invalid={touched && !!txtErr} />
-                      </div>
-                    </div>
-                    {txtLabel.trim() && <p className="hint mt-2 break-all">{txtLabel.trim().toLowerCase()}.{clean}.{domain}</p>}
-                    <p aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && txtErr ? t('claim.txt.err') : ''}</p>
-                  </details>
                   <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
                     <input type="checkbox" checked={!guide} onChange={(e) => setGuide(!e.target.checked)} className="h-5 w-5 accent-[var(--accent-text)]" />
                     {t('claim.skipGuide')}
