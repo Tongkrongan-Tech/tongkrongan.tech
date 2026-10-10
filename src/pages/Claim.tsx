@@ -22,7 +22,9 @@ export function Claim() {
   const [name, setName] = useState(initial)
   const [platform, setPlatform] = useState<PlatformId>('vercel')
   const [type, setType] = useState<RecordType>('CNAME')
-  const [value, setValue] = useState('')
+  const [values, setValues] = useState<Partial<Record<RecordType, string>>>({})
+  const value = values[type] ?? ''
+  const setValue = (v: string, ty: RecordType = type) => setValues((m) => ({ ...m, [ty]: v }))
   const [touched, setTouched] = useState(false)
   const [focus, setFocus] = useState<'name' | 'type' | 'value' | null>(null)
   const [guide, setGuide] = useState(true)
@@ -47,7 +49,7 @@ export function Claim() {
   // Lanjutkan subdomain milik sendiri yang belum aktif (mis. setelah muat ulang halaman).
   useEffect(() => {
     if (!ready || !mine || mine.status === 'active' || step !== 0 || !initial) return
-    setPlatform(mine.platform); setType(mine.type); setValue(mine.value); setTxtLabel(mine.txtLabel ?? ''); setTxtValue(mine.txtValue ?? ''); setStep(3)
+    setPlatform(mine.platform); setType(mine.type); setValues({ [mine.type]: mine.value }); setTxtLabel(mine.txtLabel ?? ''); setTxtValue(mine.txtValue ?? ''); setStep(3)
   }, [ready, mine, step, initial])
 
   async function next() {
@@ -126,7 +128,7 @@ export function Claim() {
               <h2 className="text-2xl font-bold">{t('claim.s1.h')}</h2>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label={t('claim.s1.h')}>
                 {PLATFORMS.map((x, k) => (
-                  <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { setPlatform(x.id); setType(x.defaultType); setValue('') }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
+                  <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { setPlatform(x.id); setType(x.defaultType); setValues({}) }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
                     <span className="block text-xl font-extrabold">{x.name}</span>
                     <span className="mt-1 block text-xs font-medium">{t(`plat.${x.id}.tag`)}</span>
                   </motion.button>
@@ -144,7 +146,7 @@ export function Claim() {
                     <label htmlFor="rtype" className="label">{t('claim.type')}</label>
                     <div id="rtype" role="radiogroup" aria-label={t('claim.type')} className="flex flex-wrap gap-2" onFocus={() => setFocus('type')}>
                       {p.types.map((ty) => (
-                        <button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => { setType(ty); setValue('') }} className="btn !min-h-11" style={{ background: type === ty ? 'var(--accent)' : 'var(--surface)', color: type === ty ? 'var(--accent-ink)' : 'var(--ink)' }}>{ty}</button>
+                        <button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)} className="btn !min-h-11" style={{ background: type === ty ? 'var(--accent)' : 'var(--surface)', color: type === ty ? 'var(--accent-ink)' : 'var(--ink)' }}>{ty}</button>
                       ))}
                     </div>
                     <p className="hint mt-2">{t(`type.${type}`)}</p>
