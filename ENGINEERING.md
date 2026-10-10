@@ -182,3 +182,9 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 ## Verifikasi email dengan OTP
 - Email diaktifkan lewat Resend (`RESEND_API_KEY` secret, `EMAIL_FROM` var, domain terverifikasi) dan `REQUIRE_EMAIL_VERIFY=1`.
 - Daftar baru mengirim kode 6 digit (tabel `email_otps`, migrasi 0004, hash sha256, berlaku 10 menit, maksimal 5 salah, jeda kirim ulang 60 detik) lalu halaman login beralih ke mode `otp`. Login akun yang belum terverifikasi ikut mengirim kode. Endpoint: `POST /api/auth/verify-otp` (sukses = langsung masuk) dan `POST /api/auth/resend-otp`. Tautan lama `GET /api/auth/verify` masih ada tetapi tidak lagi dikirim.
+
+## Hubungkan Vercel sekali klik (OAuth Integration)
+- Kode: `worker/vercel.ts` + rute `/api/vercel/*` di worker/index.ts, panel di langkah 2 wizard klaim (platform Vercel). Hanya tampil bila `VERCEL_CLIENT_ID`, `VERCEL_CLIENT_SECRET`, `VERCEL_INTEGRATION_SLUG`, `VERCEL_TOKEN_KEY` ada (`config.vercelConnect`).
+- Alur: `/api/vercel/start` (state cookie) -> halaman install Integration Vercel -> `/api/vercel/callback` menukar code jadi token (disimpan terenkripsi AES-GCM di `vercel_connections`) -> pengguna pilih proyek -> `POST /api/vercel/connect` menambah `nama.<domain>` ke proyek lewat API Vercel, mengambil CNAME (`/v6/domains/{d}/config`) dan TXT `_vercel` dari jawaban Vercel, lalu membuat DNS lewat jalur `createSubdomain` yang sama dengan klaim manual. TXT hanya diterima bila untuk subdomain itu dan di `_vercel.<domain>`.
+- Verifikasi memicu `POST .../verify` ke Vercel; menghapus subdomain ikut melepas domain dari proyek (best effort). Kolom `subdomains.vercel_project` (migrasi 0005).
+- Redirect URL Integration: `https://<BASE_DOMAIN>/api/vercel/callback`. Scope: Projects (Read/Write), Domains (Read/Write).

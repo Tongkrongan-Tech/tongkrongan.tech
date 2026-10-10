@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import { useStore } from '../lib/store'
+import { api } from '../lib/api'
 import { PLATFORMS, platformById, validateValue, type PlatformId, type RecordType } from '../lib/dns'
 import { checkName } from '../lib/names'
 import { NameChecker, useNameCheck } from '../components/NameChecker'
@@ -12,10 +13,10 @@ import { Icon, Spinner, StatusBadge } from '../components/ui'
 const STEPS = ['name', 'platform', 'record', 'verify'] as const
 
 export function Claim() {
-  const { t, te, domain } = usePrefs()
+  const { t, te, domain, config } = usePrefs()
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const { user, ready, subs, quota, createSub, editSub, verifySub } = useStore()
+  const { user, ready, subs, quota, createSub, editSub, verifySub, connectVercel } = useStore()
 
   const initial = (params.get('name') ?? '').toLowerCase()
   const [step, setStep] = useState(0)
@@ -26,6 +27,11 @@ export function Claim() {
   const value = values[type] ?? ''
   const setValue = (v: string, ty: RecordType = type) => setValues((m) => ({ ...m, [ty]: v }))
   const [touched, setTouched] = useState(false)
+  // Hubungkan Vercel otomatis (OAuth). 'unknown' sampai status dicek.
+  const [vConn, setVConn] = useState<'unknown' | 'no' | 'yes'>('unknown')
+  const [vProjects, setVProjects] = useState<{ id: string; name: string }[]>([])
+  const [vProject, setVProject] = useState('')
+  const vAuto = platform === 'vercel' && !!config?.vercelConnect && !!user
   const [focus, setFocus] = useState<'name' | 'type' | 'value' | null>(null)
   const [guide, setGuide] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -69,6 +75,29 @@ export function Claim() {
     }
     if (step === 2) { setTries(0); setPolling(true) }
     setStep((s) => Math.min(3, s + 1))
+  }
+
+  async function loadVercel() {
+    try {
+      const st = await api<{ connected: boolean }>('/vercel/status')
+      if (!st.connected) { setVConn('no'); return false }
+      const r = await api<{ projects: { id: string; name: string }[] }>('/vercel/projects')
+      setVProjects(r.projects); setVProject((p) => p || r.projects[0]?.id || ''); setVConn('yes')
+      return true
+    } catch { setVConn('no'); return false }
+  }
+  useEffect(() => { if (step === 2 && vAuto && vConn === 'unknown') void loadVercel() }, [step, vAuto, vConn])
+
+  function openVercel() {
+    window.open('/api/vercel/start', '_blank', 'width=560,height=760')
+    let n = 0
+    const id = setInterval(async () => { if ((await loadVercel()) || ++n > 72) clearInterval(id) }, 2500)
+  }
+
+  async function autoVercel() {
+    setBusy(true); setError('')
+    try { await connectVercel(clean, vProject) } catch (e) { setError(te(e)); setBusy(false); return }
+    setBusy(false); setTries(0); setPolling(true); setStep(3)
   }
 
   async function runVerify() {
@@ -142,6 +171,27 @@ export function Claim() {
             <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               <div>
                 <h2 className="text-2xl font-bold">{t('claim.s2.h', { p: p.name })}</h2>
+                {vAuto && !mine && (
+                  <div className="mt-5 rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
+                    <p className="text-sm font-bold">{t('claim.vauto.h')}</p>
+                    <p className="hint mt-1">{t('claim.vauto.hint')}</p>
+                    {vConn === 'yes' ? (
+                      <div className="mt-3 grid gap-3">
+                        <label htmlFor="vproj" className="label">{t('claim.vauto.project')}</label>
+                        {vProjects.length ? (
+                          <select id="vproj" className="field" value={vProject} onChange={(e) => setVProject(e.target.value)}>
+                            {vProjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                          </select>
+                        ) : <p className="hint">{t('claim.vauto.none')}</p>}
+                        <button type="button" className="btn btn-primary" disabled={busy || !vProject} onClick={() => void autoVercel()}>{busy ? <Spinner /> : t('claim.vauto.go', { host })}</button>
+                      </div>
+                    ) : (
+                      <button type="button" className="btn btn-primary mt-3" disabled={vConn === 'unknown'} onClick={openVercel}>{t('claim.vauto.connect')}</button>
+                    )}
+                    <p role="alert" className="mt-2 min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{error}</p>
+                    <p className="hint mt-1">{t('claim.vauto.or')}</p>
+                  </div>
+                )}
                 <div className="mt-5 grid gap-5">
                   <div>
                     <label htmlFor="rtype" className="label">{t('claim.type')}</label>

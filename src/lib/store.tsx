@@ -34,6 +34,7 @@ interface Ctx {
   createSub: (i: SubInput) => Promise<Sub>
   editSub: (name: string, i: Partial<SubInput>) => Promise<Sub>
   verifySub: (name: string) => Promise<Sub>
+  connectVercel: (name: string, project: string) => Promise<Sub>
   deleteSub: (name: string) => Promise<void>
 }
 const StoreCtx = createContext<Ctx>(null as never)
@@ -75,6 +76,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     logout: async () => { await api('/auth/logout', { method: 'POST' }); setUser(null); setSubs([]) },
     createSub: async (i) => { const r = await api<{ subdomain: Sub }>('/subdomains', { body: i }); put(r.subdomain); return r.subdomain },
     editSub: async (name, i) => { const r = await api<{ subdomain: Sub }>(`/subdomains/${name}`, { method: 'PATCH', body: i }); put(r.subdomain); return r.subdomain },
+    connectVercel: async (name, project) => { const r = await api<{ subdomain: Sub }>('/vercel/connect', { body: { name, project } }); put(r.subdomain); return r.subdomain },
     verifySub: async (name) => { const r = await api<{ subdomain: Sub }>(`/subdomains/${name}/verify`, { method: 'POST' }); put(r.subdomain); return r.subdomain },
     deleteSub: async (name) => { await api(`/subdomains/${name}`, { method: 'DELETE' }); setSubs((p) => p.filter((x) => x.name !== name)) },
   }), [user, subs, quota, ready, loading, loadError, refresh])

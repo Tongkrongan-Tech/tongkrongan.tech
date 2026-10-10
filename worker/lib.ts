@@ -13,6 +13,10 @@ export interface Env {
   REQUIRE_EMAIL_VERIFY?: string
   TURNSTILE_SECRET?: string
   TURNSTILE_SITEKEY?: string
+  VERCEL_CLIENT_ID?: string
+  VERCEL_CLIENT_SECRET?: string
+  VERCEL_INTEGRATION_SLUG?: string
+  VERCEL_TOKEN_KEY?: string
   GITHUB_CLIENT_ID?: string
   GITHUB_CLIENT_SECRET?: string
   GOOGLE_CLIENT_ID?: string

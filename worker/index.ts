@@ -3,6 +3,7 @@ import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, cookie, clientIp, hashPassword, json, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
+import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, vercelEnabled, verifyProjectDomain } from './vercel'
 
 const SESSION_DAYS = 30
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
@@ -10,7 +11,7 @@ const REASONS = ['phishing', 'malware', 'spam', 'illegal', 'impersonation', 'oth
 const TYPES: RecordType[] = ['A', 'AAAA', 'CNAME', 'TXT']
 
 type User = { id: string; email: string; provider: string }
-type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; verify_token: string; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
+type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; verify_token: string; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
 
 const quota = (env: Env) => Number(env.QUOTA) || 3
 const requireVerify = (env: Env) => env.REQUIRE_EMAIL_VERIFY === '1' && !!env.RESEND_API_KEY
@@ -102,12 +103,40 @@ function validateRecordInput(env: Env, b: { name?: string; platform?: string; ty
 
 /* ---------- handlers ---------- */
 
+async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateRecordInput>) {
+    if (!(await rateLimit(env, `dns:${u.id}`, 20, 3600))) throw new HttpError(429, 'rate_limited')
+    const base = checkName(b.name)
+    if (base.kind !== 'ok' || reservedExtra(env).includes(b.name)) throw new HttpError(422, 'invalid_name', { reason: (base as { reason?: string }).reason ?? 'reserved' })
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
+    if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
+    const token = randomHex(16)
+    try {
+      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, verify_token, txt_label, txt_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', token, b.txtLabel, b.txtValue, Date.now()).run()
+    } catch { throw new HttpError(409, 'taken') }
+    try {
+      const rid = await createRecord(env, hostOf(env, b.name), b.type, b.value)
+      await env.DB.prepare('UPDATE subdomains SET cf_record_id = ? WHERE name = ?').bind(rid, b.name).run()
+      if (b.txtLabel && b.txtValue) {
+        const tid = await createRecord(env, txtHost(env, b.txtLabel, b.name), 'TXT', b.txtValue)
+        await env.DB.prepare('UPDATE subdomains SET txt_record_id = ? WHERE name = ?').bind(tid, b.name).run()
+      }
+    } catch (e) {
+      const row = await env.DB.prepare('SELECT cf_record_id FROM subdomains WHERE name = ?').bind(b.name).first<{ cf_record_id: string | null }>()
+      await deleteRecord(env, row?.cf_record_id ?? null).catch(() => {})
+      await env.DB.prepare('DELETE FROM subdomains WHERE name = ?').bind(b.name).run()
+      throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) })
+    }
+    await historyAdd(env, b.name, 'h.created')
+  return ownedSub(env, u, b.name)
+}
+
 const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Promise<Response>> = {
   'GET /api/config': async (_r, env) => json({
     baseDomain: env.BASE_DOMAIN, quota: quota(env),
     oauth: { github: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) },
     turnstileSiteKey: env.TURNSTILE_SECRET && env.TURNSTILE_SITEKEY ? env.TURNSTILE_SITEKEY : null,
-    emailVerify: requireVerify(env), mock: env.DNS_MODE !== 'live',
+    emailVerify: requireVerify(env), vercelConnect: vercelEnabled(env), mock: env.DNS_MODE !== 'live',
   }),
 
   'GET /api/check': async (req, env, url) => {
@@ -232,6 +261,85 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     return json({ ok: true })
   },
 
+  'GET /api/vercel/start': async (req, env) => {
+    const u = await requireUser(req, env)
+    if (!vercelEnabled(env)) throw new HttpError(404, 'not_found')
+    const state = randomHex(16)
+    return new Response(null, { status: 302, headers: { location: `https://vercel.com/integrations/${env.VERCEL_INTEGRATION_SLUG}/new?state=${state}`, 'set-cookie': cookie(req, 'tt_vstate', `${u.id}.${state}`, 900) } })
+  },
+
+  'GET /api/vercel/callback': async (req, env, url) => {
+    const u = await requireUser(req, env)
+    if (!vercelEnabled(env)) throw new HttpError(404, 'not_found')
+    const code = url.searchParams.get('code') ?? ''
+    const st = url.searchParams.get('state') ?? ''
+    if (!code || !st || !safeEqual(readCookie(req, 'tt_vstate') ?? '', `${u.id}.${st}`)) throw new HttpError(400, 'bad_state')
+    const tok = await exchangeCode(env, code)
+    if (!tok) throw new HttpError(400, 'vercel_error')
+    await saveConnection(env, u.id, tok.token, tok.teamId)
+    const next = url.searchParams.get('next')
+    let dest = '/claim?vercel=1'
+    try { if (next && new URL(next).hostname.endsWith('vercel.com')) dest = next } catch { /* abaikan */ }
+    return new Response(null, { status: 302, headers: { location: dest, 'set-cookie': cookie(req, 'tt_vstate', '', 0) } })
+  },
+
+  'GET /api/vercel/status': async (req, env) => {
+    const u = await requireUser(req, env)
+    return json({ connected: vercelEnabled(env) && !!(await getConnection(env, u.id)) })
+  },
+
+  'DELETE /api/vercel/connection': async (req, env) => {
+    const u = await requireUser(req, env)
+    await dropConnection(env, u.id)
+    return json({ ok: true })
+  },
+
+  'GET /api/vercel/projects': async (req, env) => {
+    const u = await requireUser(req, env)
+    const conn = vercelEnabled(env) ? await getConnection(env, u.id) : null
+    if (!conn) throw new HttpError(409, 'vercel_not_connected')
+    const projects = await listProjects(conn)
+    if (!projects) { await dropConnection(env, u.id); throw new HttpError(409, 'vercel_not_connected') }
+    return json({ projects })
+  },
+
+  // Satu klik: tambahkan domain ke proyek Vercel pengguna, lalu buat DNS (CNAME + TXT bila diminta) sesuai jawaban Vercel.
+  'POST /api/vercel/connect': async (req, env) => {
+    const u = await requireUser(req, env)
+    const conn = vercelEnabled(env) ? await getConnection(env, u.id) : null
+    if (!conn) throw new HttpError(409, 'vercel_not_connected')
+    const bd = await readBody<{ name?: string; project?: string }>(req)
+    const name = String(bd.name ?? '').toLowerCase().trim()
+    const project = String(bd.project ?? '').trim()
+    if (!project || !/^[A-Za-z0-9_.-]{1,100}$/.test(project)) throw new HttpError(400, 'bad_input')
+    // cek nama, kuota, dan ketersediaan lebih dulu agar domain Vercel tidak ditambahkan sia-sia
+    const base = checkName(name)
+    if (base.kind !== 'ok' || reservedExtra(env).includes(name)) throw new HttpError(422, 'invalid_name', { reason: (base as { reason?: string }).reason ?? 'reserved' })
+    if (await env.DB.prepare('SELECT 1 FROM subdomains WHERE name = ?').bind(name).first()) throw new HttpError(409, 'taken')
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
+    if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
+
+    const domain = `${name}.${env.BASE_DOMAIN}`
+    let added = await addDomain(conn, project, domain)
+    if (added.status === 400 || added.status === 409) { const ex = await getProjectDomain(conn, project, domain); if (ex.status === 200) added = ex }
+    if (added.status !== 200) throw new HttpError(502, 'vercel_error', { detail: String(added.data?.error?.message ?? added.status).slice(0, 200) })
+
+    // TXT verifikasi hanya diterima bila untuk subdomain ini dan di _vercel domain induk
+    const chal = ((added.data.verification ?? []) as { type: string; domain: string; value: string }[]).find((v) => v.type === 'TXT')
+    const txtOk = chal && chal.domain === `_vercel.${env.BASE_DOMAIN}` && new RegExp(`^vc-domain-verify=${domain.replace(/\./g, '\\.')},[a-z0-9]{8,64}$`, 'i').test(chal.value)
+    try {
+      const cname = await recommendedCname(conn, project, domain)
+      const b = validateRecordInput(env, { name, platform: 'vercel', type: 'CNAME', value: cname, txtLabel: txtOk ? '_vercel' : '', txtValue: txtOk ? chal!.value : '' })
+      await createSubdomain(env, u, b)
+    } catch (e) {
+      await removeProjectDomain(conn, project, domain).catch(() => {})
+      throw e
+    }
+    await env.DB.prepare('UPDATE subdomains SET vercel_project = ? WHERE name = ?').bind(project, name).run()
+    if (txtOk) await verifyProjectDomain(conn, project, domain).catch(() => {})
+    return json({ subdomain: await presentSub(env, await ownedSub(env, u, name)) }, 201)
+  },
+
   'POST /api/auth/logout': async (req, env) => {
     const t = readCookie(req, 'tt_session')
     if (t) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(t)).run()
@@ -253,31 +361,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
   'POST /api/subdomains': async (req, env) => {
     const u = await requireUser(req, env)
     const b = validateRecordInput(env, await readBody(req))
-    if (!(await rateLimit(env, `dns:${u.id}`, 20, 3600))) throw new HttpError(429, 'rate_limited')
-    const base = checkName(b.name)
-    if (base.kind !== 'ok' || reservedExtra(env).includes(b.name)) throw new HttpError(422, 'invalid_name', { reason: (base as { reason?: string }).reason ?? 'reserved' })
-    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
-    if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
-    const token = randomHex(16)
-    try {
-      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, verify_token, txt_label, txt_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', token, b.txtLabel, b.txtValue, Date.now()).run()
-    } catch { throw new HttpError(409, 'taken') }
-    try {
-      const rid = await createRecord(env, hostOf(env, b.name), b.type, b.value)
-      await env.DB.prepare('UPDATE subdomains SET cf_record_id = ? WHERE name = ?').bind(rid, b.name).run()
-      if (b.txtLabel && b.txtValue) {
-        const tid = await createRecord(env, txtHost(env, b.txtLabel, b.name), 'TXT', b.txtValue)
-        await env.DB.prepare('UPDATE subdomains SET txt_record_id = ? WHERE name = ?').bind(tid, b.name).run()
-      }
-    } catch (e) {
-      const row = await env.DB.prepare('SELECT cf_record_id FROM subdomains WHERE name = ?').bind(b.name).first<{ cf_record_id: string | null }>()
-      await deleteRecord(env, row?.cf_record_id ?? null).catch(() => {})
-      await env.DB.prepare('DELETE FROM subdomains WHERE name = ?').bind(b.name).run()
-      throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) })
-    }
-    await historyAdd(env, b.name, 'h.created')
-    return json({ subdomain: await presentSub(env, (await ownedSub(env, u, b.name))) }, 201)
+    return json({ subdomain: await presentSub(env, await createSubdomain(env, u, b)) }, 201)
   },
 
   'PATCH /api/subdomains/:name': async (req, env, _u, m) => {
@@ -308,6 +392,10 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
     if (Date.now() - s.last_check_at < 8000) throw new HttpError(429, 'too_fast')
     await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ?').bind(Date.now(), s.name).run()
+    if (s.platform === 'vercel' && s.vercel_project) {
+      const conn = await getConnection(env, u.id).catch(() => null)
+      if (conn) await verifyProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
+    }
     const r = await verifyRecord(env, s)
     if (r.ok) {
       await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(Date.now(), s.name).run()
@@ -325,6 +413,10 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const s = await ownedSub(env, u, m[1])
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
     try { await deleteRecord(env, s.cf_record_id); await deleteRecord(env, s.txt_record_id) } catch (e) { throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) }) }
+    if (s.platform === 'vercel' && s.vercel_project) {
+      const conn = await getConnection(env, u.id).catch(() => null)
+      if (conn) await removeProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
+    }
     await env.DB.batch([
       env.DB.prepare('DELETE FROM history WHERE name = ?').bind(s.name),
       env.DB.prepare('DELETE FROM checks WHERE name = ?').bind(s.name),

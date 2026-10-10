@@ -8,6 +8,7 @@ export interface Config {
   oauth: { github: boolean; google: boolean }
   turnstileSiteKey: string | null
   emailVerify: boolean
+  vercelConnect?: boolean
   mock: boolean
 }
 
