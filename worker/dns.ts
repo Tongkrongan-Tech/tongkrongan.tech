@@ -1,5 +1,6 @@
 import type { Env } from './lib'
 import type { RecordType } from '../src/lib/dns'
+import { desecCreate, desecDelete, desecUpdate } from './desec'
 
 const CF = 'https://api.cloudflare.com/client/v4'
 export const isMock = (env: Env) => env.DNS_MODE !== 'live'
@@ -23,16 +24,19 @@ const body = (host: string, type: RecordType, value: string) => ({
 // Semua operasi memakai nama host lengkap, jadi record utama dan record TXT tambahan memakai kode yang sama.
 export async function createRecord(env: Env, host: string, type: RecordType, value: string): Promise<string | null> {
   if (isMock(env)) return null
+  if (env.DNS_PROVIDER === 'desec') return desecCreate(env, host, type, value)
   return (await cf(env, '/dns_records', { method: 'POST', body: JSON.stringify(body(host, type, value)) }))!.id
 }
 export async function updateRecord(env: Env, recordId: string | null, host: string, type: RecordType, value: string): Promise<string | null> {
   if (isMock(env)) return null
   if (!recordId) return createRecord(env, host, type, value)
+  if (env.DNS_PROVIDER === 'desec') return desecUpdate(env, recordId, host, type, value)
   await cf(env, `/dns_records/${recordId}`, { method: 'PUT', body: JSON.stringify(body(host, type, value)) })
   return recordId
 }
 export async function deleteRecord(env: Env, recordId: string | null) {
   if (isMock(env) || !recordId) return
+  if (env.DNS_PROVIDER === 'desec') return desecDelete(env, recordId)
   try { await cf(env, `/dns_records/${recordId}`, { method: 'DELETE' }) } catch (e) { if (!/not exist|81044/i.test(String(e))) throw e }
 }
 // `_vercel` memang harus di domain induk (syarat Vercel), selain itu TXT tambahan di bawah subdomain pengguna.

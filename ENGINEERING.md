@@ -188,3 +188,8 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Alur: `/api/vercel/start` (state cookie) -> halaman install Integration Vercel -> `/api/vercel/callback` menukar code jadi token (disimpan terenkripsi AES-GCM di `vercel_connections`) -> pengguna pilih proyek -> `POST /api/vercel/connect` menambah `nama.<domain>` ke proyek lewat API Vercel, mengambil CNAME (`/v6/domains/{d}/config`) dan TXT `_vercel` dari jawaban Vercel, lalu membuat DNS lewat jalur `createSubdomain` yang sama dengan klaim manual. TXT hanya diterima bila untuk subdomain itu dan di `_vercel.<domain>`.
 - Verifikasi memicu `POST .../verify` ke Vercel; menghapus subdomain ikut melepas domain dari proyek (best effort). Kolom `subdomains.vercel_project` (migrasi 0005).
 - Redirect URL Integration: `https://<BASE_DOMAIN>/api/vercel/callback`. Scope: Projects (Read/Write), Domains (Read/Write).
+
+## Adapter DNS deSEC (percobaan)
+- `DNS_PROVIDER=desec` + secret `DESEC_TOKEN` memindahkan operasi record dari Cloudflare ke deSEC (`worker/desec.ts`, dipanggil dari `worker/dns.ts`). Default tetap Cloudflare. Id record disimpan sebagai JSON `{s,t,v}` karena deSEC memakai RRset (banyak nilai per nama+tipe), TTL 3600 (minimum akun gratis).
+- Uji tanpa jaringan: `npm test` (server deSEC tiruan di memori; menguji create/update/delete, penggabungan banyak TXT di `_vercel`, idempoten, retry 429). Belum diuji ke deSEC sungguhan.
+- Catatan: custom domain Worker butuh zona di Cloudflare, jadi percobaan deSEC dijalankan sebagai deployment terpisah (workers.dev, D1 sendiri).

@@ -13,6 +13,8 @@ export interface Env {
   REQUIRE_EMAIL_VERIFY?: string
   TURNSTILE_SECRET?: string
   TURNSTILE_SITEKEY?: string
+  DNS_PROVIDER?: string
+  DESEC_TOKEN?: string
   VERCEL_CLIENT_ID?: string
   VERCEL_CLIENT_SECRET?: string
   VERCEL_INTEGRATION_SLUG?: string

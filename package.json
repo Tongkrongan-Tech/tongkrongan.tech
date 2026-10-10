@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "db:local": "wrangler d1 migrations apply tongkrongan --local",
     "db:remote": "wrangler d1 migrations apply tongkrongan --remote",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test": "node --test --experimental-strip-types tests/*.test.ts"
   },
   "dependencies": {
     "@fontsource/poppins": "^5.3.0",
