@@ -13,10 +13,10 @@
     { "binding": "DB", "database_name": "tongkrongan", "database_id": "9d395367-7fcf-4cf2-8b9d-d8edeb3f50de", "migrations_dir": "migrations" }
   ],
   "workers_dev": true,
-  "routes": [{ "pattern": "floworks.my.id", "custom_domain": true }],
+  "routes": [{ "pattern": "tongkrongan.tech", "custom_domain": true }],
   "triggers": { "crons": ["*/15 * * * *"] },
   "vars": {
-    "BASE_DOMAIN": "floworks.my.id",
+    "BASE_DOMAIN": "tongkrongan.tech",
     "QUOTA": "3",
     "DNS_MODE": "live",
     "TURNSTILE_SITEKEY": "0x4AAAAAAFOTMKmv3k5iVvji"

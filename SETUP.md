@@ -1,6 +1,6 @@
 # SETUP.md: dari kode ke operasional (semua gratis, kecuali domain)
 
-Panduan ini membawa proyek dari komputer lokal ke layanan hidup di Cloudflare. Uji awal memakai `floworks.my.id`; pindah ke `tongkrongan.tech` hanya mengganti beberapa nilai (bagian akhir).
+Panduan ini membawa proyek dari komputer lokal ke layanan hidup di Cloudflare. Domain produksi: `tongkrongan.tech`.
 
 Cek halaman harga Cloudflare sebelum mulai; batas gratis bisa berubah, terutama **jumlah record DNS per zona**.
 
@@ -13,8 +13,8 @@ Cek halaman harga Cloudflare sebelum mulai; batas gratis bisa berubah, terutama 
 
 ## 1. Domain induk masuk Cloudflare
 
-1. Daftar di https://dash.cloudflare.com (gratis), klik **Add a domain**, masukkan `floworks.my.id`, pilih paket **Free**.
-2. Cloudflare memberi 2 nameserver. Ganti nameserver `floworks.my.id` di registrar kamu ke dua nameserver itu.
+1. Daftar di https://dash.cloudflare.com (gratis), klik **Add a domain**, masukkan `tongkrongan.tech`, pilih paket **Free**.
+2. Cloudflare memberi 2 nameserver. Ganti nameserver `tongkrongan.tech` di registrar kamu ke dua nameserver itu.
 3. Tunggu status zona **Active** (menit sampai beberapa jam).
 4. Catat **Zone ID**: halaman Overview zona, kolom kanan bawah.
 
@@ -24,7 +24,7 @@ Cek halaman harga Cloudflare sebelum mulai; batas gratis bisa berubah, terutama 
 
 My Profile, **API Tokens**, **Create Token**, **Custom token**:
 - Permissions: **Zone, DNS, Edit**
-- Zone Resources: **Include, Specific zone, floworks.my.id**
+- Zone Resources: **Include, Specific zone, tongkrongan.tech**
 
 Simpan token (hanya tampil sekali). **Jangan kirim token lewat chat atau commit ke git.**
 
@@ -62,7 +62,7 @@ Wrangler mencetak alamat seperti `https://tongkrongan.<akun>.workers.dev`. Buka 
 ## 6. Uji setelah deploy (wajib, ini jalur yang belum pernah dites dengan kredensial asli)
 
 1. Daftar akun, klaim nama bebas, mis. `uji1`, platform **VPS**, tipe **A**, isi IP publik server uji milikmu.
-2. Di dashboard Cloudflare, tab DNS: harus muncul record `uji1.floworks.my.id` bertipe A, komentar `managed by tongkrongan`.
+2. Di dashboard Cloudflare, tab DNS: harus muncul record `uji1.tongkrongan.tech` bertipe A, komentar `managed by tongkrongan`.
 3. Pilih platform **Vercel**, tipe **CNAME**, isi target dari proyek Vercel-mu, lalu tambahkan alamat tadi di Vercel (Settings, Domains). Halaman klaim mengecek otomatis tiap 10 detik; status harus berubah jadi **Aktif** tanpa menekan tombol.
 4. Coba gagal: sebelum menambahkan domain di platform, pesan harus menjelaskan sebabnya (`DNS` belum menjawab, atau `platform` belum menyajikan situsmu).
 5. Hapus subdomain dari dasbor: record di Cloudflare harus ikut hilang.
@@ -75,7 +75,7 @@ Wrangler mencetak alamat seperti `https://tongkrongan.<akun>.workers.dev`. Buka 
 | **Login GitHub** | GitHub, Settings, Developer settings, OAuth Apps, New. Callback: `https://<alamat-app>/api/auth/github/callback`. Lalu `wrangler secret put GITHUB_CLIENT_ID` dan `GITHUB_CLIENT_SECRET`. Tombolnya muncul otomatis. |
 | **Login Google** | Google Cloud Console, APIs & Services, Credentials, OAuth client (Web). Redirect URI: `https://<alamat-app>/api/auth/google/callback`. Secret: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. |
 | **Captcha Turnstile** | Cloudflare, Turnstile, Add widget. Secret: `TURNSTILE_SECRET`; tambahkan var `TURNSTILE_SITEKEY` di wrangler.jsonc. Aktif di daftar, login, lapor. |
-| **Verifikasi email** | Akun Resend (gratis), verifikasi domain pengirim lewat record DNS, lalu secret `RESEND_API_KEY`, var `EMAIL_FROM` (mis. `Tongkrongan <halo@floworks.my.id>`) dan `REQUIRE_EMAIL_VERIFY=1`. |
+| **Verifikasi email** | Akun Resend (gratis), verifikasi domain pengirim lewat record DNS, lalu secret `RESEND_API_KEY`, var `EMAIL_FROM` (mis. `Tongkrongan <halo@tongkrongan.tech>`) dan `REQUIRE_EMAIL_VERIFY=1`. |
 | **Safe Browsing** | Google Cloud, aktifkan Safe Browsing API, buat API key, secret `SAFE_BROWSING_KEY`. Cron menangguhkan subdomain yang terdeteksi. Periksa syarat penggunaan (umumnya non-komersial). |
 | **Email abuse** | Cloudflare, Email Routing, buat alamat `abuse@<domain>` yang diteruskan ke emailmu. |
 | **Pemantauan** | Sentry dan UptimeRobot/Better Stack, akun gratis. |
@@ -94,14 +94,9 @@ curl -H "$H" -X POST -H content-type:application/json -d '{"email":"x@y.z"}' $A/
 
 `suspend` menghapus record DNS dan mengunci nama (pemilik tidak bisa menghapus atau mengklaim ulang).
 
-## 9. Pindah ke tongkrongan.tech (setelah domain dibeli)
+## 9. Catatan domain tongkrongan.tech
 
-1. Beli domain, tambahkan ke Cloudflare, ganti nameserver (langkah 1 untuk domain baru).
-2. Buat token baru + ambil Zone ID baru (langkah 2), jalankan ulang `wrangler secret put CF_API_TOKEN` dan `CF_ZONE_ID`.
-3. Ubah `BASE_DOMAIN` di wrangler.jsonc menjadi `tongkrongan.tech`.
-4. (Opsional) alamat aplikasi di domain sendiri: tambahkan `"routes": [{ "pattern": "tongkrongan.tech", "custom_domain": true }]` ke wrangler.jsonc.
-5. `npm run deploy`. Subdomain lama di `floworks.my.id` tidak ikut pindah (data uji, hapus atau biarkan).
-6. Ajukan `tongkrongan.tech` ke Public Suffix List (syarat umur domain berlaku), sesuai PRD.
+- Ajukan `tongkrongan.tech` ke Public Suffix List (syarat umur domain berlaku), sesuai PRD.
 
 ## 10. Pengembangan lokal
 

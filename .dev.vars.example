@@ -1,5 +1,5 @@
 # Salin ke .dev.vars (jangan di-commit) untuk pengembangan lokal.
 # mock = tidak menyentuh Cloudflare/DNS sungguhan, verifikasi selalu lolos. Hanya untuk lokal.
 DNS_MODE=mock
-BASE_DOMAIN=floworks.my.id
+BASE_DOMAIN=tongkrongan.tech
 ADMIN_TOKEN=ganti-dengan-string-acak-panjang

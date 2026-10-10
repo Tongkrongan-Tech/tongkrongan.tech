@@ -25,7 +25,7 @@ node scripts/contrast.mjs        # kontras WCAG AA semua tema
 | Nama merek | **tongkrongan.tech** (pakai "k") | Dikoreksi pemilik. **PRD.md masih menulis "tongrongan"**, belum diubah. |
 | Stack frontend | Vite + React 19 + TypeScript + Tailwind v4 + Framer Motion + React Router | PRD mengusulkan Next.js; Vite dipilih karena tidak butuh SSR. |
 | Stack backend | Cloudflare Workers + D1 (SQLite) + Cron Triggers, tanpa framework | Semua gratis dalam satu akun; menggantikan Node + PostgreSQL + Redis di PRD. Satu Worker menyajikan `dist/` dan `/api/*`. |
-| Domain induk | `BASE_DOMAIN` di wrangler.jsonc, dikirim ke frontend lewat `/api/config` | Uji di `floworks.my.id`, produksi `tongkrongan.tech` tanpa ubah kode. Teks UI memakai `{domain}`. |
+| Domain induk | `BASE_DOMAIN` di wrangler.jsonc, dikirim ke frontend lewat `/api/config` | Produksi `tongkrongan.tech`; bisa diganti tanpa ubah kode. Teks UI memakai `{domain}`. |
 | Bukti kepemilikan | Otomatis, tanpa berkas: DNS menjawab sesuai record **dan** situs tampil di alamat itu (HTTP status < 400). Tipe TXT cukup DNS menjawab. UI mengecek tiap 10 detik (maks 18 kali), Cron tiap 15 menit sampai 24 jam | Platform (Vercel, Cloudflare Pages, Railway) hanya menyajikan domain yang sudah ditambahkan pemilik proyek, jadi respons sukses menjadi bukti kendali; memenuhi "respons HTTP" di PRD. Berkas token sebelumnya terlalu merepotkan pengguna. Kelemahan: untuk tujuan IP/hosting biasa, server yang menjawab semua Host dianggap lolos; risiko ini ditutup oleh Safe Browsing, laporan, dan penangguhan. |
 | Sesi | Cookie `tt_session` HttpOnly, SameSite=Lax, token acak di-hash SHA-256 di D1; sandi PBKDF2-SHA256 100k | Tanpa JWT. CSRF: cek Origin pada metode non-GET. |
 | Font | **Poppins** (self-host via `@fontsource/poppins`, bobot 300-800) | Permintaan pemilik. Tanpa request ke Google Fonts. `--font-mono` juga dipetakan ke Poppins. **Jangan menambah font lain.** |
@@ -126,7 +126,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 
 ### 2026-10-05, backend operasional (agent: Claude Sonnet 5.5)
 - Mode demo dihapus. Dibangun Worker (router, auth PBKDF2 + sesi cookie, CSRF Origin, rate limit D1, subdomain CRUD, lapor, API admin, OAuth GitHub/Google, Turnstile, Resend, Cron), skema D1 `migrations/0001_init.sql`, `wrangler.jsonc`, `.dev.vars.example`.
-- Domain induk dari `BASE_DOMAIN` (uji `floworks.my.id`); teks UI memakai `{domain}`; `names.ts`/`dns.ts` dipakai bersama.
+- Domain induk dari `BASE_DOMAIN` (kini `tongkrongan.tech`); teks UI memakai `{domain}`; `names.ts`/`dns.ts` dipakai bersama.
 - Verifikasi kepemilikan diganti dari kotak centang TXT ke berkas token HTTP + cek DNS via DoH.
 - Frontend: `api.ts`, store berbasis API, NameChecker memanggil `/api/check`, Claim membuat record saat langkah 3, Dashboard/Login/Report memakai API, komponen Turnstile, pesan galat API ramah (`te()`).
 - Perbaikan: pelindung CSRF menolak permintaan lewat proxy dev (Host/Origin tidak sama), diatasi `changeOrigin` + header origin di vite.config.ts.
@@ -152,7 +152,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 
 ### 2026-10-05, repositori GitHub (agent: Claude Sonnet 5.5)
 - Repo privat https://github.com/xyyxzxx/tongkrongan.tech (branch `main`; dibuat di akun azizuzezo, lalu ditransfer ke xyyxzxx). Rahasia tidak ikut (`.dev.vars`, `.admin-token`, `.wrangler` di-gitignore; sudah dipindai sebelum commit). Tambah README.md.
-- Produksi masih memakai `BASE_DOMAIN=floworks.my.id` sampai domain `tongkrongan.tech` dibeli; langkah pindah ada di SETUP.md bagian 9.
+- Domain `tongkrongan.tech` sudah dibeli; `BASE_DOMAIN` dan route custom domain di wrangler.jsonc, serta SETUP.md, diubah ke `tongkrongan.tech`. Pemilik perlu: tambah zona ke Cloudflare, perbarui secret `CF_API_TOKEN` + `CF_ZONE_ID` untuk zona baru, lalu `npm run deploy`.
 
 ### Backlog yang disarankan
 1. og:image dari logo (logo sudah terpasang di navbar, footer, favicon).
