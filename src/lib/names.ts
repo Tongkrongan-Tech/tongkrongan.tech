@@ -1,19 +1,13 @@
 // Aturan nama F3: 3-32 karakter, huruf kecil, angka, tanda hubung.
-export const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/
+import { classifyName } from './reserved'
 
-const RESERVED = [
-  'www', 'mail', 'admin', 'api', 'root', 'ftp', 'ns1', 'ns2', 'smtp', 'imap', 'pop', 'support',
-  'abuse', 'postmaster', 'webmaster', 'help', 'status', 'dashboard', 'app', 'blog', 'docs',
-  'login', 'cdn', 'static', 'tongkrongan', 'security', 'billing', 'dns',
-]
-// Nama yang menyerupai merek atau lembaga resmi (contoh awal, daftar nyata dikelola admin, F12).
-const BRAND = ['google', 'facebook', 'instagram', 'tokopedia', 'gojek', 'bca', 'bri', 'mandiri', 'polri', 'kemendikbud', 'pemerintah', 'paypal']
+export const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/
 
 export type NameState =
   | { kind: 'empty' }
   | { kind: 'invalid'; reason: 'short' | 'long' | 'chars' | 'edge' | 'reserved' | 'brand' }
   | { kind: 'taken'; mine?: boolean }
-  | { kind: 'ok' }
+  | { kind: 'ok'; review?: boolean }
 
 export function checkName(raw: string, taken: string[] = [], mine: string[] = []): NameState {
   const n = raw.trim().toLowerCase()
@@ -22,11 +16,13 @@ export function checkName(raw: string, taken: string[] = [], mine: string[] = []
   if (n.length > 32) return { kind: 'invalid', reason: 'long' }
   if (!/^[a-z0-9-]+$/.test(n)) return { kind: 'invalid', reason: 'chars' }
   if (n.startsWith('-') || n.endsWith('-')) return { kind: 'invalid', reason: 'edge' }
-  if (RESERVED.includes(n)) return { kind: 'invalid', reason: 'reserved' }
-  if (BRAND.some((b) => n === b || n.includes(b))) return { kind: 'invalid', reason: 'brand' }
+  // Daftar terlarang (vital, merek, tokoh, kata kasar) dengan normalisasi leet dan tanda hubung.
+  const v = classifyName(n)
+  if (v.block === 'brand') return { kind: 'invalid', reason: 'brand' }
+  if (v.block) return { kind: 'invalid', reason: 'reserved' }
   if (mine.includes(n)) return { kind: 'taken', mine: true }
   if (taken.includes(n)) return { kind: 'taken' }
-  return { kind: 'ok' }
+  return { kind: 'ok', review: v.review }
 }
 
 // Nama dasar untuk saran alternatif; ketersediaan tiap kandidat dicek ke server.

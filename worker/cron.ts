@@ -1,4 +1,6 @@
-import { deleteRecord, flaggedBySafeBrowsing, healthCheck, verifyRecord } from './dns'
+import { deleteRecord, flaggedBySafeBrowsing, healthCheck, hostOf, verifyRecord } from './dns'
+import { fetchPageText, scanAbuse } from './abuse'
+import { classifyName } from '../src/lib/reserved'
 import type { Env } from './lib'
 import { getConnection, verifyProjectDomain } from './vercel'
 import type { RecordType } from '../src/lib/dns'
@@ -51,7 +53,6 @@ export async function runCron(env: Env) {
   }
 
   // 3. Health check subdomain aktif, dan subdomain gagal (down) supaya bisa pulih sendiri.
-  // Simpan hasilnya, tandai gagal bila 5 cek terakhir mati (deteksi takeover).
   const active = await env.DB.prepare("SELECT name, status FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason = 'down') ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string }>()
   for (const { name, status } of active.results) {
     const ok = await healthCheck(env, name)
@@ -79,5 +80,28 @@ export async function runCron(env: Env) {
     await deleteRecord(env, s.txt_record_id)
     await env.DB.prepare("UPDATE subdomains SET status = 'suspended', fail_reason = 'suspended', cf_record_id = NULL, txt_record_id = NULL WHERE name = ?").bind(s.name).run()
     await hist(env, s.name, 'h.suspended', 'safe-browsing')
+  }
+
+  // 5. Pindai isi situs subdomain aktif untuk judi online, penipuan, dan konten terlarang.
+  // Ambang 2 kecocokan agar tidak salah suspensi hanya karena satu kata. Sampling acak per putaran.
+  const scan = await env.DB.prepare("SELECT name, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' ORDER BY RANDOM() LIMIT 20").all<{ name: string; cf_record_id: string | null; txt_record_id: string | null }>()
+  for (const s of scan.results) {
+    const text = await fetchPageText(`https://${hostOf(env, s.name)}/`)
+    if (!text) continue
+    const hits = scanAbuse(text)
+    if (hits.length >= 2) {
+      await deleteRecord(env, s.cf_record_id)
+      await deleteRecord(env, s.txt_record_id)
+      await env.DB.prepare("UPDATE subdomains SET status = 'suspended', fail_reason = 'suspended', cf_record_id = NULL, txt_record_id = NULL WHERE name = ?").bind(s.name).run()
+      await hist(env, s.name, 'h.suspended', `abuse:${hits.slice(0, 3).join(',')}`)
+    }
+  }
+
+  // 6. Tandai nama yang menyerupai merek atau tokoh untuk review manusia (tidak ditolak otomatis).
+  const reviewCandidates = await env.DB.prepare("SELECT name FROM subdomains WHERE status IN ('active','pending','failed') LIMIT 200").all<{ name: string }>()
+  for (const { name } of reviewCandidates.results) {
+    if (!classifyName(name).review) continue
+    const already = await env.DB.prepare("SELECT 1 FROM history WHERE name = ? AND key = 'h.needsReview'").bind(name).first()
+    if (!already) await hist(env, name, 'h.needsReview')
   }
 }
