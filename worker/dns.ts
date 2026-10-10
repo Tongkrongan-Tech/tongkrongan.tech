@@ -35,7 +35,8 @@ export async function deleteRecord(env: Env, recordId: string | null) {
   if (isMock(env) || !recordId) return
   try { await cf(env, `/dns_records/${recordId}`, { method: 'DELETE' }) } catch (e) { if (!/not exist|81044/i.test(String(e))) throw e }
 }
-export const txtHost = (env: Env, label: string, name: string) => `${label}.${name}.${env.BASE_DOMAIN}`
+// `_vercel` memang harus di domain induk (syarat Vercel), selain itu TXT tambahan di bawah subdomain pengguna.
+export const txtHost = (env: Env, label: string, name: string) => label === '_vercel' ? `_vercel.${env.BASE_DOMAIN}` : `${label}.${name}.${env.BASE_DOMAIN}`
 
 export type VerifyFail = 'dns' | 'http' | 'platform'
 export type VerifyOutcome = { ok: true } | { ok: false; reason: VerifyFail }

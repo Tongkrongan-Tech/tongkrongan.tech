@@ -84,6 +84,8 @@ function validateRecordInput(env: Env, b: { name?: string; platform?: string; ty
   if (txtLabel || txtValue) {
     // TXT tambahan hanya boleh di bawah nama subdomain sendiri: _label.nama.<domain>
     if (!/^_[a-z0-9-]{1,40}$/.test(txtLabel) || !txtValue || txtValue.length > 255) throw new HttpError(422, 'invalid_txt')
+    // TXT `_vercel` ada di domain induk, jadi nilainya wajib mengikat ke subdomain pemilik sendiri.
+    if (txtLabel === '_vercel' && !new RegExp(`^vc-domain-verify=${(name + '.' + env.BASE_DOMAIN).replace(/\./g, '\\.')},[a-z0-9]{8,64}$`, 'i').test(txtValue)) throw new HttpError(422, 'invalid_txt')
   }
   return { name, platform: platform.id, type, value, txtLabel: txtLabel || null, txtValue: txtValue || null }
 }

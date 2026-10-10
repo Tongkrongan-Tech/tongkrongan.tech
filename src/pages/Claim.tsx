@@ -30,7 +30,6 @@ export function Claim() {
   const [guide, setGuide] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [txtLabel, setTxtLabel] = useState('')
   const [txtValue, setTxtValue] = useState('')
   const [tries, setTries] = useState(0)
   const [polling, setPolling] = useState(true)
@@ -43,13 +42,15 @@ export function Claim() {
   const mine = subs.find((s) => s.name === clean)
   const quotaFull = subs.length >= quota && !mine
   const host = `${clean}.${domain}`
-  const txtErr = (txtLabel.trim() || txtValue.trim()) && (!/^_[a-z0-9-]{1,40}$/.test(txtLabel.trim().toLowerCase()) || !txtValue.trim())
+  // TXT verifikasi Vercel (opsional): dibuat di _vercel.<domain>, nilainya harus untuk subdomain ini
+  const vercelTxt = platform === 'vercel' ? txtValue.trim() : ''
+  const txtErr = !!vercelTxt && !new RegExp(`^vc-domain-verify=${(clean + '.' + domain).replace(/\./g, '\\.')},[a-z0-9]{8,64}$`, 'i').test(vercelTxt)
 
   useEffect(() => { document.title = `${t('claim.title')} | Tongkrongan.tech` }, [t])
   // Lanjutkan subdomain milik sendiri yang belum aktif (mis. setelah muat ulang halaman).
   useEffect(() => {
     if (!ready || !mine || mine.status === 'active' || step !== 0 || !initial) return
-    setPlatform(mine.platform); setType(mine.type); setValues({ [mine.type]: mine.value }); setTxtLabel(mine.txtLabel ?? ''); setTxtValue(mine.txtValue ?? ''); setStep(3)
+    setPlatform(mine.platform); setType(mine.type); setValues({ [mine.type]: mine.value }); setTxtValue(mine.txtLabel === '_vercel' ? mine.txtValue ?? '' : ''); setStep(3)
   }, [ready, mine, step, initial])
 
   async function next() {
@@ -59,7 +60,7 @@ export function Claim() {
       setTouched(true)
       if (valErr || txtErr) return
       setBusy(true)
-      const input = { platform, type, value: value.trim(), txtLabel: txtLabel.trim().toLowerCase(), txtValue: txtValue.trim() }
+      const input = { platform, type, value: value.trim(), txtLabel: vercelTxt ? '_vercel' : '', txtValue: vercelTxt }
       try {
         if (mine) await editSub(clean, input)
         else await createSub({ name: clean, ...input })
@@ -163,6 +164,15 @@ export function Claim() {
                     </div>
                     {p.placeholder[type] && <button type="button" className="mt-1 cursor-pointer border-0 bg-transparent p-0 py-2 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => setValue(p.placeholder[type]!)}>{t('claim.useExample')}</button>}
                   </div>
+                  {platform === 'vercel' && (
+                    <details open={!!txtValue} className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)' }}>
+                      <summary className="cursor-pointer text-sm font-bold">{t('claim.vtxt.h')}</summary>
+                      <p className="hint mt-2">{t('claim.vtxt.hint', { domain })}</p>
+                      <label htmlFor="vtx" className="label mt-3">{t('claim.txt.value')}</label>
+                      <input id="vtx" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={`vc-domain-verify=${clean || 'nama'}.${domain},xxxxxxxx`} autoComplete="off" spellCheck={false} aria-invalid={touched && txtErr} />
+                      <p aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && txtErr ? t('claim.vtxt.err', { domain }) : ''}</p>
+                    </details>
+                  )}
                   <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
                     <input type="checkbox" checked={!guide} onChange={(e) => setGuide(!e.target.checked)} className="h-5 w-5 accent-[var(--accent-text)]" />
                     {t('claim.skipGuide')}

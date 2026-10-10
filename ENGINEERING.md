@@ -166,3 +166,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 ## Reset kata sandi dan tampil/sembunyi sandi
 - Tabel `password_resets` (migrasi 0003), endpoint `POST /api/auth/forgot` (selalu menjawab ok agar email tidak bisa ditebak) dan `POST /api/auth/reset` (token sekali pakai, berlaku 1 jam, semua sesi akun dihapus). Halaman `/reset`, mode "lupa sandi" di halaman login, tombol Lihat/Sembunyi di kolom sandi.
 - Butuh `RESEND_API_KEY` dan `EMAIL_FROM`. Bila belum diset, `/forgot` menjawab 503 `email_off`.
+
+## TXT verifikasi Vercel di domain induk
+- Vercel meminta TXT `_vercel.<domain induk>` bila nama subdomain pernah dipakai di akun Vercel lain. Di form klaim (platform Vercel) ada isian opsional; server membuat TXT itu di `_vercel.tongkrongan.tech` (`txtHost` di worker/dns.ts) memakai kolom `txt_label='_vercel'`, `txt_value`, `txt_record_id` yang sudah ada, sehingga hapus/suspend/edit ikut membersihkannya.
+- Keamanan: nilai wajib `vc-domain-verify=<nama>.<domain>,<kode>` untuk subdomain milik pengguna itu sendiri (divalidasi di server), jadi tidak bisa dipakai untuk membuktikan nama orang lain.
