@@ -3,7 +3,7 @@ import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, cookie, clientIp, hashPassword, json, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
-import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, vercelEnabled, verifyProjectDomain } from './vercel'
+import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
 
 const SESSION_DAYS = 30
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
@@ -264,8 +264,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
   'GET /api/vercel/start': async (req, env) => {
     const u = await requireUser(req, env)
     if (!vercelEnabled(env)) throw new HttpError(404, 'not_found')
-    const state = randomHex(16)
-    return new Response(null, { status: 302, headers: { location: `https://vercel.com/integrations/${env.VERCEL_INTEGRATION_SLUG}/new?state=${state}`, 'set-cookie': cookie(req, 'tt_vstate', `${u.id}.${state}`, 900) } })
+    return new Response(null, { status: 302, headers: { location: `https://vercel.com/integrations/${env.VERCEL_INTEGRATION_SLUG}/new?state=${await makeState(env, u.id)}` } })
   },
 
   'GET /api/vercel/callback': async (req, env, url) => {
@@ -273,14 +272,14 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!vercelEnabled(env)) throw new HttpError(404, 'not_found')
     const code = url.searchParams.get('code') ?? ''
     const st = url.searchParams.get('state') ?? ''
-    if (!code || !st || !safeEqual(readCookie(req, 'tt_vstate') ?? '', `${u.id}.${st}`)) throw new HttpError(400, 'bad_state')
+    if (!code || !st || !(await checkState(env, u.id, st))) throw new HttpError(400, 'bad_state')
     const tok = await exchangeCode(env, code)
     if (!tok) throw new HttpError(400, 'vercel_error')
     await saveConnection(env, u.id, tok.token, tok.teamId)
     const next = url.searchParams.get('next')
     let dest = '/claim?vercel=1'
     try { if (next && new URL(next).hostname.endsWith('vercel.com')) dest = next } catch { /* abaikan */ }
-    return new Response(null, { status: 302, headers: { location: dest, 'set-cookie': cookie(req, 'tt_vstate', '', 0) } })
+    return new Response(null, { status: 302, headers: { location: dest } })
   },
 
   'GET /api/vercel/status': async (req, env) => {

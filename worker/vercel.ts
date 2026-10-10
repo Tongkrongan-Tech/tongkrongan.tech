@@ -68,3 +68,19 @@ export async function recommendedCname(conn: VercelConn, project: string, domain
   const list = (r.data.recommendedCNAME ?? []) as { rank: number; value: string }[]
   return list.sort((a, b) => a.rank - b.rank)[0]?.value?.replace(/\.$/, '') ?? 'cname.vercel-dns.com'
 }
+
+// State OAuth bertanda tangan (HMAC), terikat ke pengguna dan berlaku 15 menit. Tanpa cookie, jadi beberapa percobaan bisa berjalan bersamaan.
+async function hmac(env: Env, data: string) {
+  const k = await crypto.subtle.importKey('raw', unhex(env.VERCEL_TOKEN_KEY!), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return hex(new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(data))))
+}
+export async function makeState(env: Env, userId: string) {
+  const body = `${hex(crypto.getRandomValues(new Uint8Array(8)))}.${Date.now() + 900_000}`
+  return `${body}.${await hmac(env, `${userId}.${body}`)}`
+}
+export async function checkState(env: Env, userId: string, state: string) {
+  const [nonce, exp, sig] = state.split('.')
+  if (!nonce || !exp || !sig || Number(exp) < Date.now()) return false
+  const want = await hmac(env, `${userId}.${nonce}.${exp}`)
+  return want.length === sig.length && want === sig
+}
