@@ -14,6 +14,13 @@ async function hist(env: Env, name: string, key: string, detail?: string) {
 export async function runCron(env: Env) {
   const now = Date.now()
 
+  // 0. Bersihkan data kedaluwarsa: sesi, token reset sandi, dan kode OTP.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now),
+    env.DB.prepare('DELETE FROM password_resets WHERE expires_at < ?').bind(now),
+    env.DB.prepare('DELETE FROM email_otps WHERE expires_at < ?').bind(now),
+  ])
+
   // 1. Subdomain yang belum pernah aktif dan lewat 24 jam dilepas (mencegah record menggantung).
   const stale = await env.DB.prepare("SELECT * FROM subdomains WHERE activated_at IS NULL AND status IN ('pending','failed','verifying') AND created_at < ? LIMIT 50").bind(now - DAY).all<Row>()
   for (const s of stale.results) {
@@ -43,13 +50,19 @@ export async function runCron(env: Env) {
     }
   }
 
-  // 3. Health check subdomain aktif, simpan hasilnya, tandai gagal bila 5 cek terakhir mati (deteksi takeover).
-  const active = await env.DB.prepare("SELECT name FROM subdomains WHERE status = 'active' ORDER BY RANDOM() LIMIT 50").all<{ name: string }>()
-  for (const { name } of active.results) {
+  // 3. Health check subdomain aktif, dan subdomain gagal (down) supaya bisa pulih sendiri.
+  // Simpan hasilnya, tandai gagal bila 5 cek terakhir mati (deteksi takeover).
+  const active = await env.DB.prepare("SELECT name, status FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason = 'down') ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string }>()
+  for (const { name, status } of active.results) {
     const ok = await healthCheck(env, name)
     await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, ?, ?)').bind(name, ok ? 1 : 0, now).run()
     await env.DB.prepare('DELETE FROM checks WHERE name = ? AND id NOT IN (SELECT id FROM checks WHERE name = ? ORDER BY id DESC LIMIT 30)').bind(name, name).run()
-    if (!ok) {
+    if (ok) {
+      if (status === 'failed') {
+        await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL WHERE name = ? AND status = 'failed'").bind(name).run()
+        await hist(env, name, 'h.active')
+      }
+    } else {
       const last = await env.DB.prepare('SELECT ok FROM checks WHERE name = ? ORDER BY id DESC LIMIT 5').bind(name).all<{ ok: number }>()
       if (last.results.length === 5 && last.results.every((x) => !x.ok)) {
         await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = 'down' WHERE name = ?").bind(name).run()
@@ -58,8 +71,8 @@ export async function runCron(env: Env) {
     }
   }
 
-  // 4. Daftar ancaman: tangguhkan otomatis bila terdeteksi.
-  const all = await env.DB.prepare("SELECT name, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' LIMIT 400").all<{ name: string; cf_record_id: string | null; txt_record_id: string | null }>()
+  // 4. Daftar ancaman: tangguhkan otomatis bila terdeteksi. Acak supaya semua subdomain kebagian dipindai.
+  const all = await env.DB.prepare("SELECT name, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' ORDER BY RANDOM() LIMIT 400").all<{ name: string; cf_record_id: string | null; txt_record_id: string | null }>()
   const flagged = await flaggedBySafeBrowsing(env, all.results.map((x) => x.name))
   for (const s of all.results.filter((x) => flagged.has(x.name))) {
     await deleteRecord(env, s.cf_record_id)

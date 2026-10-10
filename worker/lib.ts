@@ -37,10 +37,19 @@ const hex = (b: ArrayBuffer | Uint8Array) => [...new Uint8Array(b as ArrayBuffer
 export const randomHex = (bytes = 16) => hex(crypto.getRandomValues(new Uint8Array(bytes)))
 export const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)))
 
-export async function hashPassword(pw: string, saltHex: string) {
+// Iterasi PBKDF2-SHA256. Nilai lama (hash tanpa awalan) dianggap 100000 dan otomatis di-rehash saat login berikutnya.
+export const PBKDF2_ITERATIONS = 600000
+
+export async function hashPassword(pw: string, saltHex: string, iterations = PBKDF2_ITERATIONS) {
   const key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits'])
   const salt = new Uint8Array(saltHex.match(/../g)!.map((h) => parseInt(h, 16)))
-  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256))
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256)
+  return `${iterations}$${hex(bits)}`
+}
+// Bentuk baru: "<iterasi>$<hex>". Hash lama (hanya hex) tetap didukung sebagai 100000 iterasi.
+export function parsePasswordHash(stored: string): { iterations: number; hash: string } {
+  const m = /^(\d+)\$([0-9a-f]+)$/.exec(stored)
+  return m ? { iterations: Number(m[1]), hash: m[2] } : { iterations: 100000, hash: stored }
 }
 export const safeEqual = (a: string, b: string) => {
   if (a.length !== b.length) return false
@@ -58,11 +67,10 @@ export const readCookie = (req: Request, name: string) =>
 
 export const clientIp = (req: Request) => req.headers.get('cf-connecting-ip') ?? 'local'
 
-// Mengembalikan false bila batas terlampaui.
+// Mengembalikan false bila batas terlampaui. Pakai UPSERT + RETURNING agar hitungan dan keputusan atomik.
 export async function rateLimit(env: Env, key: string, limit: number, windowSec: number): Promise<boolean> {
   const w = Math.floor(Date.now() / 1000 / windowSec)
-  await env.DB.prepare('INSERT INTO rate_limits (k, w, n) VALUES (?, ?, 1) ON CONFLICT(k, w) DO UPDATE SET n = n + 1').bind(key, w).run()
-  const row = await env.DB.prepare('SELECT n FROM rate_limits WHERE k = ? AND w = ?').bind(key, w).first<{ n: number }>()
+  const row = await env.DB.prepare('INSERT INTO rate_limits (k, w, n) VALUES (?, ?, 1) ON CONFLICT(k, w) DO UPDATE SET n = n + 1 RETURNING n').bind(key, w).first<{ n: number }>()
   await env.DB.prepare('DELETE FROM rate_limits WHERE w < ?').bind(w - 2).run()
   return (row?.n ?? 0) <= limit
 }

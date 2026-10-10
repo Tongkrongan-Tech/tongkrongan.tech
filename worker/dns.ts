@@ -54,13 +54,14 @@ async function doh(name: string, type: string): Promise<string[]> {
 async function timedFetch(url: string, init: RequestInit = {}) {
   const c = new AbortController()
   const t = setTimeout(() => c.abort(), 8000)
-  try { return await fetch(url, { ...init, signal: c.signal, redirect: 'follow' }) } finally { clearTimeout(t) }
+  try { return await fetch(url, { ...init, signal: c.signal, redirect: init.redirect ?? 'follow' }) } finally { clearTimeout(t) }
 }
 
 // Verifikasi otomatis, tanpa berkas bukti:
 // (1) DNS sudah menjawab sesuai record; (2) untuk tujuan situs, situs benar-benar tampil di alamat ini.
 // Platform (Vercel, Cloudflare Pages, Railway) hanya menyajikan domain yang sudah ditambahkan pemilik proyek,
-// jadi respons sukses itu sendiri menjadi bukti kendali atas tujuan. Respons 4xx/5xx = platform belum menyajikan.
+// jadi respons sukses itu sendiri menjadi bukti kendali atas tujuan.
+// Hanya respons 2xx yang dianggap bukti. Redirect (3xx) tidak diikuti, jadi halaman placeholder yang mengalihkan ke tempat lain tidak lolos.
 export async function verifyRecord(env: Env, s: { name: string; type: RecordType; value: string }): Promise<VerifyOutcome> {
   // Mode mock (hanya lokal): nilai yang mengandung "fail" memicu kegagalan agar jalur galat bisa diuji.
   if (isMock(env)) return s.value.includes('fail') ? { ok: false, reason: 'platform' } : { ok: true }
@@ -69,13 +70,13 @@ export async function verifyRecord(env: Env, s: { name: string; type: RecordType
   const got = await doh(host, s.type).catch(() => [] as string[])
   const match = s.type === 'AAAA' ? got.some((g) => g.replace(/:0+/g, ':') === want.replace(/:0+/g, ':') || g === want) : got.includes(want)
   if (!match) return { ok: false, reason: 'dns' }
-  if (s.type === 'TXT') return { ok: true }
+  if (s.type === 'TXT') return { ok: false, reason: 'dns' } // TXT tidak boleh jadi tipe utama; verifikasi lewat tipe lain
   let answered = false
   for (const scheme of ['https', 'http']) {
     try {
-      const r = await timedFetch(`${scheme}://${host}/`)
+      const r = await timedFetch(`${scheme}://${host}/`, { redirect: 'manual' })
       answered = true
-      if (r.status < 400) return { ok: true }
+      if (r.status >= 200 && r.status < 300) return { ok: true }
     } catch { /* coba skema berikutnya */ }
   }
   return { ok: false, reason: answered ? 'platform' : 'http' }
