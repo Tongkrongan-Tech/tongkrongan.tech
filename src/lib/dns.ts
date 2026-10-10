@@ -16,7 +16,7 @@ export interface Platform {
 export const PLATFORMS: Platform[] = [
   { id: 'cloudflare', name: 'Cloudflare', types: ['CNAME', 'A', 'AAAA'], defaultType: 'CNAME', placeholder: { CNAME: 'proyekmu.pages.dev', A: '203.0.113.10', AAAA: '2001:db8::10' }, needsTxt: false, docs: 'https://developers.cloudflare.com/pages/configuration/custom-domains/', color: '#ff9d3d' },
   { id: 'railway', name: 'Railway', types: ['CNAME', 'TXT'], defaultType: 'CNAME', placeholder: { CNAME: 'xxxx.up.railway.app', TXT: 'railway-verify=xxxxxxxx' }, needsTxt: true, docs: 'https://docs.railway.com/guides/public-networking', color: '#b79cff' },
-  { id: 'vercel', name: 'Vercel', types: ['CNAME', 'A', 'TXT'], defaultType: 'CNAME', placeholder: { CNAME: 'cname.vercel-dns.com', A: '203.0.113.20', TXT: 'vc-domain-verify=xxxx' }, needsTxt: true, docs: 'https://vercel.com/docs/domains/working-with-domains/add-a-domain', color: '#9fe3c2' },
+  { id: 'vercel', name: 'Vercel', types: ['CNAME', 'A', 'TXT'], defaultType: 'CNAME', placeholder: { CNAME: 'cname.vercel-dns.com', A: '203.0.113.20', TXT: 'vc-domain-verify=xxxx' }, needsTxt: false, docs: 'https://vercel.com/docs/domains/working-with-domains/add-a-domain', color: '#9fe3c2' },
   { id: 'vps', name: 'VPS', types: ['A', 'AAAA'], defaultType: 'A', placeholder: { A: '203.0.113.30', AAAA: '2001:db8::30' }, needsTxt: false, docs: 'https://caddyserver.com/docs/automatic-https', color: '#ffd25e' },
   { id: 'hosting', name: 'Hosting lain', types: ['A', 'CNAME'], defaultType: 'A', placeholder: { A: '203.0.113.40', CNAME: 'server.hostingku.example' }, needsTxt: false, docs: '', color: '#f4a6c0' },
 ]
