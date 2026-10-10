@@ -1,6 +1,6 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
 import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
-import { HttpError, cookie, clientIp, hashPassword, json, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
+import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
 import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
@@ -10,11 +10,21 @@ const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
 const REASONS = ['phishing', 'malware', 'spam', 'illegal', 'impersonation', 'other']
 const TYPES: RecordType[] = ['A', 'AAAA', 'CNAME', 'TXT']
 
+// Header keamanan untuk semua respons. CSP mengizinkan skrip inline (bootstrap tema di index.html) dan Cloudflare Turnstile.
+const SECURITY_HEADERS: Record<string, string> = {
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'geolocation=(), camera=(), microphone=(), payment=()',
+  'content-security-policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com",
+}
+
 type User = { id: string; email: string; provider: string }
-type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; verify_token: string; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
+type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
 
 const quota = (env: Env) => Number(env.QUOTA) || 3
-const requireVerify = (env: Env) => env.REQUIRE_EMAIL_VERIFY === '1' && !!env.RESEND_API_KEY
+// Verifikasi email aktif hanya bila diminta DAN email benar-benar bisa dikirim (RESEND_API_KEY + EMAIL_FROM).
+const requireVerify = (env: Env) => env.REQUIRE_EMAIL_VERIFY === '1' && !!env.RESEND_API_KEY && !!env.EMAIL_FROM
 const reservedExtra = (env: Env) => [env.BASE_DOMAIN.split('.')[0]]
 
 async function readBody<T>(req: Request): Promise<T> {
@@ -88,6 +98,8 @@ function validateRecordInput(env: Env, b: { name?: string; platform?: string; ty
   const type = b.type as RecordType
   const value = String(b.value ?? '').trim()
   if (!platform || !TYPES.includes(type) || !platform.types.includes(type)) throw new HttpError(400, 'bad_input')
+  // TXT tidak boleh menjadi tipe utama: verifikasi TXT hanya membuktikan DNS milik kita, bukan kendali atas tujuan.
+  if (type === 'TXT') throw new HttpError(400, 'bad_input')
   const err = validateValue(type, value, name, env.BASE_DOMAIN)
   if (err) throw new HttpError(422, 'invalid_value', { reason: err })
   const txtLabel = String(b.txtLabel ?? '').trim().toLowerCase().replace(/\.$/, '')
@@ -109,10 +121,9 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
     if (base.kind !== 'ok' || reservedExtra(env).includes(b.name)) throw new HttpError(422, 'invalid_name', { reason: (base as { reason?: string }).reason ?? 'reserved' })
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
     if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
-    const token = randomHex(16)
     try {
-      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, verify_token, txt_label, txt_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', token, b.txtLabel, b.txtValue, Date.now()).run()
+      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, txt_label, txt_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', b.txtLabel, b.txtValue, Date.now()).run()
     } catch { throw new HttpError(409, 'taken') }
     try {
       const rid = await createRecord(env, hostOf(env, b.name), b.type, b.value)
@@ -122,10 +133,11 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
         await env.DB.prepare('UPDATE subdomains SET txt_record_id = ? WHERE name = ?').bind(tid, b.name).run()
       }
     } catch (e) {
+      console.error('createRecord gagal', b.name, e)
       const row = await env.DB.prepare('SELECT cf_record_id FROM subdomains WHERE name = ?').bind(b.name).first<{ cf_record_id: string | null }>()
       await deleteRecord(env, row?.cf_record_id ?? null).catch(() => {})
       await env.DB.prepare('DELETE FROM subdomains WHERE name = ?').bind(b.name).run()
-      throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) })
+      throw new HttpError(502, 'dns_provider')
     }
     await historyAdd(env, b.name, 'h.created')
   return ownedSub(env, u, b.name)
@@ -171,14 +183,18 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
     const email = String(b.email ?? '').trim().toLowerCase()
     const pw = String(b.password ?? '')
-    if (!EMAIL_RE.test(email)) throw new HttpError(422, 'email')
+    if (email.length > 254 || !EMAIL_RE.test(email)) throw new HttpError(422, 'email')
     if (pw.length < 8 || pw.length > 128) throw new HttpError(422, 'password')
     const exists = await env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()
-    if (exists) throw new HttpError(409, 'exists')
-    const id = randomHex(12), salt = randomHex(16), vtoken = randomHex(24)
+    if (exists) {
+      // Jangan ungkap apakah email terdaftar (anti enumerasi). Jawab sama seperti pendaftaran baru, dan beri tahu pemilik akun.
+      await sendEmail(env, email, 'Percobaan pendaftaran di Tongkrongan.tech', '<p>Ada yang mencoba mendaftar dengan email ini, tetapi akun sudah ada. Bila itu kamu, silakan masuk atau atur ulang kata sandi. Bila bukan, abaikan email ini.</p>').catch(() => {})
+      return requireVerify(env) ? json({ needVerify: true }) : json({ ok: true })
+    }
+    const id = randomHex(12), salt = randomHex(16)
     const verified = requireVerify(env) ? 0 : 1
-    await env.DB.prepare('INSERT INTO users (id, email, pw_hash, pw_salt, provider, verified, verify_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(id, email, await hashPassword(pw, salt), salt, 'email', verified, vtoken, Date.now()).run()
+    await env.DB.prepare('INSERT INTO users (id, email, pw_hash, pw_salt, provider, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, email, await hashPassword(pw, salt), salt, 'email', verified, Date.now()).run()
     if (!verified) {
       await issueOtp(env, { id, email })
       return json({ needVerify: true })
@@ -193,10 +209,15 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!(await rateLimit(env, `login:${ip}:${email}`, 10, 900))) throw new HttpError(429, 'rate_limited')
     if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
     const u = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first<{ id: string; pw_hash: string | null; pw_salt: string | null; verified: number; blocked: number }>()
-    const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16))
-    if (!u || !u.pw_hash || !safeEqual(attempt, u.pw_hash)) throw new HttpError(401, 'invalid_credentials')
+    const stored = u?.pw_hash ? parsePasswordHash(u.pw_hash) : null
+    const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16), stored?.iterations ?? PBKDF2_ITERATIONS)
+    if (!u || !u.pw_hash || !stored || !safeEqual(attempt.slice(attempt.indexOf('$') + 1), stored.hash)) throw new HttpError(401, 'invalid_credentials')
     if (u.blocked) throw new HttpError(403, 'blocked')
     if (!u.verified && requireVerify(env)) { await issueOtp(env, { id: u.id, email }); throw new HttpError(403, 'unverified') }
+    // Naikkan iterasi hash lama ke standar terbaru saat login berhasil.
+    if (stored.iterations < PBKDF2_ITERATIONS && u.pw_salt) {
+      await env.DB.prepare('UPDATE users SET pw_hash = ? WHERE id = ?').bind(await hashPassword(String(b.password ?? ''), u.pw_salt), u.id).run()
+    }
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
   },
 
@@ -213,7 +234,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
       throw new HttpError(400, 'bad_code')
     }
     if (u.blocked) throw new HttpError(403, 'blocked')
-    await env.DB.prepare('UPDATE users SET verified = 1, verify_token = NULL WHERE id = ?').bind(u.id).run()
+    await env.DB.prepare('UPDATE users SET verified = 1 WHERE id = ?').bind(u.id).run()
     await env.DB.prepare('DELETE FROM email_otps WHERE user_id = ?').bind(u.id).run()
     return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, u.id) })
   },
@@ -278,7 +299,14 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     await saveConnection(env, u.id, tok.token, tok.teamId)
     const next = url.searchParams.get('next')
     let dest = '/claim?vercel=1'
-    try { if (next && new URL(next).hostname.endsWith('vercel.com')) dest = next } catch { /* abaikan */ }
+    try {
+      // Hanya izinkan host Vercel yang sah. endsWith('vercel.com') saja tidak aman (cocok untuk evil-vercel.com).
+      if (next) {
+        const target = new URL(next)
+        const host = target.hostname.toLowerCase()
+        if (target.protocol === 'https:' && (host === 'vercel.com' || host.endsWith('.vercel.com') || host.endsWith('.vercel.app'))) dest = next
+      }
+    } catch { /* abaikan */ }
     return new Response(null, { status: 302, headers: { location: dest } })
   },
 
@@ -321,7 +349,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const domain = `${name}.${env.BASE_DOMAIN}`
     let added = await addDomain(conn, project, domain)
     if (added.status === 400 || added.status === 409) { const ex = await getProjectDomain(conn, project, domain); if (ex.status === 200) added = ex }
-    if (added.status !== 200) throw new HttpError(502, 'vercel_error', { detail: String(added.data?.error?.message ?? added.status).slice(0, 200) })
+    if (added.status !== 200) { console.error('addDomain gagal', name, added.status, added.data?.error?.message); throw new HttpError(502, 'vercel_error') }
 
     // TXT verifikasi hanya diterima bila untuk subdomain ini dan di _vercel domain induk
     const chal = ((added.data.verification ?? []) as { type: string; domain: string; value: string }[]).find((v) => v.type === 'TXT')
@@ -343,12 +371,6 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const t = readCookie(req, 'tt_session')
     if (t) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(t)).run()
     return json({ ok: true }, 200, { 'set-cookie': cookie(req, 'tt_session', '', 0) })
-  },
-
-  'GET /api/auth/verify': async (_req, env, url) => {
-    const t = url.searchParams.get('token') ?? ''
-    const r = t ? await env.DB.prepare('UPDATE users SET verified = 1, verify_token = NULL WHERE verify_token = ?').bind(t).run() : null
-    return Response.redirect(`${url.origin}/login?verified=${r?.meta.changes ? 1 : 0}`, 302)
   },
 
   'GET /api/subdomains': async (req, env) => {
@@ -378,7 +400,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
         if (s.txt_label !== b.txtLabel) { await deleteRecord(env, s.txt_record_id); tid = await createRecord(env, txtHost(env, b.txtLabel, s.name), 'TXT', b.txtValue) }
         else tid = await updateRecord(env, s.txt_record_id, txtHost(env, b.txtLabel, s.name), 'TXT', b.txtValue)
       } else await deleteRecord(env, s.txt_record_id)
-    } catch (e) { throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) }) }
+    } catch (e) { console.error('updateRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
     await env.DB.prepare("UPDATE subdomains SET platform = ?, type = ?, value = ?, cf_record_id = ?, txt_label = ?, txt_value = ?, txt_record_id = ?, status = 'pending', fail_reason = NULL, last_check_at = 0 WHERE name = ?")
       .bind(b.platform, b.type, b.value, rid, b.txtLabel, b.txtValue, tid, s.name).run()
     await historyAdd(env, s.name, 'h.edited', `${b.type} ${b.value}`)
@@ -411,7 +433,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const u = await requireUser(req, env)
     const s = await ownedSub(env, u, m[1])
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
-    try { await deleteRecord(env, s.cf_record_id); await deleteRecord(env, s.txt_record_id) } catch (e) { throw new HttpError(502, 'dns_provider', { detail: String(e).slice(0, 200) }) }
+    try { await deleteRecord(env, s.cf_record_id); await deleteRecord(env, s.txt_record_id) } catch (e) { console.error('deleteRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
     if (s.platform === 'vercel' && s.vercel_project) {
       const conn = await getConnection(env, u.id).catch(() => null)
       if (conn) await removeProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
@@ -434,7 +456,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!REASONS.includes(String(b.reason))) throw new HttpError(422, 'reason')
     const exists = await env.DB.prepare('SELECT 1 FROM subdomains WHERE name = ?').bind(name).first()
     if (!exists) throw new HttpError(404, 'not_found')
-    const id = randomHex(3).toUpperCase()
+    const id = randomHex(8).toUpperCase()
     await env.DB.prepare('INSERT INTO reports (id, name, reason, detail, ip_hash, at) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(id, name, b.reason, String(b.detail ?? '').slice(0, 600), (await sha256(ip + env.BASE_DOMAIN)).slice(0, 16), Date.now()).run()
     return json({ ok: true, id, name })
@@ -538,24 +560,32 @@ function match(method: string, path: string) {
   return null
 }
 
+async function handleFetch(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url)
+  if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req)
+  try {
+    csrfGuard(req)
+    const oauth = url.pathname.match(/^\/api\/auth\/(github|google)\/(start|callback)$/)
+    if (oauth && req.method === 'GET') return oauth[2] === 'start' ? await oauthStart(req, env, url, oauth[1] as 'github') : await oauthCallback(req, env, url, oauth[1] as 'github')
+    const adm = await admin(req, env, url)
+    if (adm) return adm
+    const hit = match(req.method, url.pathname)
+    if (!hit) throw new HttpError(404, 'not_found')
+    return await hit.handler(req, env, url, hit.params)
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.code, ...e.extra }, e.status)
+    console.error(e)
+    return json({ error: 'server' }, 500)
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const url = new URL(req.url)
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req)
-    try {
-      csrfGuard(req)
-      const oauth = url.pathname.match(/^\/api\/auth\/(github|google)\/(start|callback)$/)
-      if (oauth && req.method === 'GET') return oauth[2] === 'start' ? await oauthStart(req, env, url, oauth[1] as 'github') : await oauthCallback(req, env, url, oauth[1] as 'github')
-      const adm = await admin(req, env, url)
-      if (adm) return adm
-      const hit = match(req.method, url.pathname)
-      if (!hit) throw new HttpError(404, 'not_found')
-      return await hit.handler(req, env, url, hit.params)
-    } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.code, ...e.extra }, e.status)
-      console.error(e)
-      return json({ error: 'server' }, 500)
-    }
+    const res = await handleFetch(req, env)
+    const headers = new Headers(res.headers)
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!headers.has(k)) headers.set(k, v)
+    if (new URL(req.url).protocol === 'https:') headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains')
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
   },
   async scheduled(_c: ScheduledController, env: Env) { await runCron(env) },
 }
