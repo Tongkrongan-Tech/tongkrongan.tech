@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import { useStore } from '../lib/store'
 import { api } from '../lib/api'
+import { genericTxtInvalid } from '../lib/txt'
 import { PLATFORMS, platformById, validateValue, type PlatformId, type RecordType } from '../lib/dns'
 import { checkName } from '../lib/names'
 import { NameChecker, useNameCheck } from '../components/NameChecker'
@@ -11,6 +12,9 @@ import { DnsDiagram } from '../components/DnsDiagram'
 import { Icon, Spinner, StatusBadge } from '../components/ui'
 
 const STEPS = ['name', 'platform', 'record', 'verify'] as const
+
+// Nama TXT bawaan per platform yang butuh verifikasi TXT selain Vercel.
+const TXT_LABEL_DEFAULT: Partial<Record<PlatformId, string>> = { railway: '_railway-verify' }
 
 export function Claim() {
   const { t, te, domain, config } = usePrefs()
@@ -37,6 +41,7 @@ export function Claim() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [txtValue, setTxtValue] = useState('')
+  const [txtLabel, setTxtLabel] = useState<string | null>(null) // null = pakai bawaan platform
   const [tries, setTries] = useState(0)
   const [polling, setPolling] = useState(true)
 
@@ -51,12 +56,18 @@ export function Claim() {
   // TXT verifikasi Vercel (opsional): dibuat di _vercel.<domain>, nilainya harus untuk subdomain ini
   const vercelTxt = platform === 'vercel' ? txtValue.trim() : ''
   const txtErr = !!vercelTxt && !new RegExp(`^vc-domain-verify=${(clean + '.' + domain).replace(/\./g, '\\.')},[a-z0-9]{8,64}$`, 'i').test(vercelTxt)
+  // TXT verifikasi platform lain (mis. Railway): nama diawali garis bawah, nilai bebas. Aturan sama dengan backend (validateRecordInput).
+  const genericTxt = platform !== 'vercel' && !!p.needsTxt
+  const genLabel = (txtLabel ?? TXT_LABEL_DEFAULT[platform] ?? '').trim().toLowerCase()
+  const genValue = genericTxt ? txtValue.trim() : ''
+  const genErr = genericTxt && genericTxtInvalid(genLabel, genValue, txtLabel !== null)
+  const txtInput = platform === 'vercel' ? { txtLabel: vercelTxt ? '_vercel' : '', txtValue: vercelTxt } : { txtLabel: genValue ? genLabel : '', txtValue: genValue }
 
   useEffect(() => { document.title = `${t('claim.title')} | Tongkrongan.tech` }, [t])
   // Lanjutkan subdomain milik sendiri yang belum aktif (mis. setelah muat ulang halaman).
   useEffect(() => {
     if (!ready || !mine || mine.status === 'active' || step !== 0 || !initial) return
-    setPlatform(mine.platform); setType(mine.type); setValues({ [mine.type]: mine.value }); setTxtValue(mine.txtLabel === '_vercel' ? mine.txtValue ?? '' : ''); setStep(3)
+    setPlatform(mine.platform); setType(mine.type); setValues({ [mine.type]: mine.value }); setTxtValue(mine.txtLabel ? mine.txtValue ?? '' : ''); setTxtLabel(mine.txtLabel && mine.txtLabel !== '_vercel' ? mine.txtLabel : null); setStep(3)
   }, [ready, mine, step, initial])
 
   async function next() {
@@ -64,9 +75,9 @@ export function Claim() {
     if (step === 0 && !user) { nav('/login', { state: { from: `/claim?name=${clean}` } }); return }
     if (step === 2) {
       setTouched(true)
-      if (valErr || txtErr) return
+      if (valErr || txtErr || genErr) return
       setBusy(true)
-      const input = { platform, type, value: value.trim(), txtLabel: vercelTxt ? '_vercel' : '', txtValue: vercelTxt }
+      const input = { platform, type, value: value.trim(), ...txtInput }
       try {
         if (mine) await editSub(clean, input)
         else await createSub({ name: clean, ...input })
@@ -158,7 +169,7 @@ export function Claim() {
               <h2 className="text-2xl font-bold">{t('claim.s1.h')}</h2>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={t('claim.s1.h')}>
                 {PLATFORMS.map((x, k) => (
-                  <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { setPlatform(x.id); setType(x.defaultType); setValues({}) }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
+                  <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { if (x.id !== platform) { setTxtValue(''); setTxtLabel(null) } setPlatform(x.id); setType(x.defaultType); setValues({}) }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
                     <span className="block text-xl font-extrabold">{x.name}</span>
                     <span className="mt-1 block text-xs font-medium">{t(`plat.${x.id}.tag`)}</span>
                   </motion.button>
@@ -221,6 +232,23 @@ export function Claim() {
                       <label htmlFor="vtx" className="label mt-3">{t('claim.txt.value')}</label>
                       <input id="vtx" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={`vc-domain-verify=${clean || 'nama'}.${domain},xxxxxxxx`} autoComplete="off" spellCheck={false} aria-invalid={touched && txtErr} />
                       <p aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && txtErr ? t('claim.vtxt.err', { domain }) : ''}</p>
+                    </details>
+                  )}
+                  {genericTxt && (
+                    <details open className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)' }}>
+                      <summary className="cursor-pointer text-sm font-bold">{t('claim.txt.h')}</summary>
+                      <p className="hint mt-2">{t('claim.txt.hint')}</p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.6fr]">
+                        <div>
+                          <label htmlFor="gtl" className="label">{t('claim.txt.label')}</label>
+                          <input id="gtl" className="field" value={txtLabel ?? TXT_LABEL_DEFAULT[platform] ?? ''} onChange={(e) => setTxtLabel(e.target.value)} placeholder="_railway-verify" autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
+                        </div>
+                        <div>
+                          <label htmlFor="gtv" className="label">{t('claim.txt.value')}</label>
+                          <input id="gtv" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={p.placeholder.TXT ?? ''} autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
+                        </div>
+                      </div>
+                      <p id="gtx-e" aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && genErr ? t('claim.txt.err') : ''}</p>
                     </details>
                   )}
                   <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">

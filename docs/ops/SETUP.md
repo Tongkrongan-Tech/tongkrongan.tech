@@ -74,13 +74,18 @@ Wrangler mencetak alamat seperti `https://tongkrongan.<akun>.workers.dev`. Buka 
 | --- | --- |
 | **Login GitHub** | GitHub, Settings, Developer settings, OAuth Apps, New. Callback: `https://<alamat-app>/api/auth/github/callback`. Lalu `wrangler secret put GITHUB_CLIENT_ID` dan `GITHUB_CLIENT_SECRET`. Tombolnya muncul otomatis. |
 | **Login Google** | Google Cloud Console, APIs & Services, Credentials, OAuth client (Web). Redirect URI: `https://<alamat-app>/api/auth/google/callback`. Secret: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. |
+| **Login Discord** | https://discord.com/developers/applications, New Application, tab OAuth2. Tambahkan Redirect: `https://<alamat-app>/api/auth/discord/callback` (harus persis sama, termasuk `https`). Salin Client ID dan Client Secret (Reset Secret), lalu `wrangler secret put DISCORD_CLIENT_ID` dan `DISCORD_CLIENT_SECRET`. Aplikasi meminta scope `identify email`; hanya email yang **terverifikasi di Discord** yang diterima. Ini berbeda dari `DISCORD_WEBHOOK_URL` (notifikasi ke channel). Tombol muncul otomatis. |
 | **Captcha Turnstile** | Cloudflare, Turnstile, Add widget. Secret: `TURNSTILE_SECRET`; tambahkan var `TURNSTILE_SITEKEY` di wrangler.jsonc. Aktif di daftar, login, lapor. |
 | **Verifikasi email** | Akun Resend (gratis), verifikasi domain pengirim lewat record DNS, lalu secret `RESEND_API_KEY`, var `EMAIL_FROM` (mis. `Tongkrongan <halo@tongkrongan.tech>`) dan `REQUIRE_EMAIL_VERIFY=1`. |
 | **Safe Browsing** | Google Cloud, aktifkan Safe Browsing API, buat API key, secret `SAFE_BROWSING_KEY`. Cron menangguhkan subdomain yang terdeteksi. Periksa syarat penggunaan (umumnya non-komersial). |
 | **Email abuse** | Cloudflare, Email Routing, buat alamat `abuse@<domain>` yang diteruskan ke emailmu. |
 | **Pemantauan** | Sentry dan UptimeRobot/Better Stack, akun gratis. |
 
-## 8. Moderasi tanpa UI (API admin)
+## 8. Moderasi: halaman /admin dan API admin
+
+Cara paling mudah: buka `https://<alamat-app>/admin`, masukkan `ADMIN_TOKEN`, lalu kelola laporan terbuka (periksa subdomain dan pemilik, tangguhkan, blokir pemilik, tandai selesai) atau pakai panel "Tindakan manual". Token hanya disimpan di tab itu (sessionStorage) dan hilang saat tab ditutup; halaman tidak ditautkan di navigasi dan tidak diindeks mesin pencari. Penangguhan menghapus record DNS dan tidak bisa dibatalkan dari UI.
+
+Di balik halaman itu, API admin yang sama bisa dipanggil langsung (tanpa UI):
 
 Semua dengan header `Authorization: Bearer <ADMIN_TOKEN>`:
 

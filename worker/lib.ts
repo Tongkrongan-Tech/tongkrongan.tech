@@ -25,6 +25,7 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string
   DISCORD_CLIENT_ID?: string
   DISCORD_CLIENT_SECRET?: string
+  DISCORD_WEBHOOK_URL?: string
 }
 
 export class HttpError extends Error {

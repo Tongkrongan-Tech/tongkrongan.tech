@@ -3,6 +3,8 @@ import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
+import { discordVerifiedEmail } from './oauth'
+import { notifyClaimActive, notifyVercelConnected } from './notify'
 import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
 
 const SESSION_DAYS = 14
@@ -332,6 +334,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const tok = await exchangeCode(env, code)
     if (!tok) throw new HttpError(400, 'vercel_error')
     await saveConnection(env, u.id, tok.token, tok.teamId)
+    await notifyVercelConnected(env, u.email)
     const next = url.searchParams.get('next')
     let dest = '/claim?vercel=1'
     try {
@@ -457,6 +460,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
       await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(Date.now(), s.name).run()
       await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, 1, ?)').bind(s.name, Date.now()).run()
       await historyAdd(env, s.name, 'h.active')
+      if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform, u.email)
     } else {
       await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = ? WHERE name = ?").bind(r.reason, s.name).run()
       await historyAdd(env, s.name, 'h.failed', r.reason)
@@ -529,26 +533,29 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
     await env.DB.batch([env.DB.prepare('UPDATE users SET blocked = 1 WHERE id = ?').bind(u.id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(u.id)])
     return json({ ok: true })
   }
+  // Konteks untuk moderator: status subdomain dan pemiliknya, supaya laporan bisa dinilai dan pemilik bisa diblokir.
+  const info = url.pathname.match(/^\/api\/admin\/subdomains\/([a-z0-9-]{1,63})$/)
+  if (req.method === 'GET' && info) {
+    const r = await env.DB.prepare('SELECT s.name, s.platform, s.type, s.value, s.status, s.created_at, s.activated_at, u.email AS owner_email, u.blocked AS owner_blocked FROM subdomains s JOIN users u ON u.id = s.user_id WHERE s.name = ?').bind(info[1]).first()
+    if (!r) throw new HttpError(404, 'not_found')
+    return json({ subdomain: r })
+  }
   throw new HttpError(404, 'not_found')
 }
 
-/* ---------- OAuth (GitHub, Google, Discord) ---------- */
-function oauthCreds(env: Env, provider: OAuthProvider): { id?: string; secret?: string } {
-  if (provider === 'github') return { id: env.GITHUB_CLIENT_ID, secret: env.GITHUB_CLIENT_SECRET }
-  if (provider === 'google') return { id: env.GOOGLE_CLIENT_ID, secret: env.GOOGLE_CLIENT_SECRET }
-  return { id: env.DISCORD_CLIENT_ID, secret: env.DISCORD_CLIENT_SECRET }
-}
+/* ---------- OAuth ---------- */
+const oauthCreds = (env: Env, p: OAuthProvider) => p === 'github' ? [env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET] : p === 'google' ? [env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET] : [env.DISCORD_CLIENT_ID, env.DISCORD_CLIENT_SECRET]
 
 async function oauthStart(req: Request, env: Env, url: URL, provider: OAuthProvider) {
-  const { id, secret } = oauthCreds(env, provider)
-  if (!id || !secret) throw new HttpError(404, 'not_configured')
+  const [id, sec] = oauthCreds(env, provider)
+  if (!id || !sec) throw new HttpError(404, 'not_configured')
   const state = randomHex(16)
-  const redirect = `${url.origin}/api/auth/${provider}/callback`
+  const redirect = encodeURIComponent(`${url.origin}/api/auth/${provider}/callback`)
   const dest = provider === 'github'
-    ? `https://github.com/login/oauth/authorize?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&scope=${encodeURIComponent('user:email')}&state=${state}`
+    ? `https://github.com/login/oauth/authorize?client_id=${id}&redirect_uri=${redirect}&scope=${encodeURIComponent('user:email')}&state=${state}`
     : provider === 'google'
-      ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent('openid email')}&state=${state}`
-      : `https://discord.com/oauth2/authorize?client_id=${id}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${encodeURIComponent('identify email')}&state=${state}`
+      ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${id}&redirect_uri=${redirect}&response_type=code&scope=${encodeURIComponent('openid email')}&state=${state}`
+      : `https://discord.com/oauth2/authorize?client_id=${id}&redirect_uri=${redirect}&response_type=code&scope=${encodeURIComponent('identify email')}&state=${state}`
   return new Response(null, { status: 302, headers: { location: dest, 'set-cookie': cookie(req, 'tt_oauth', state, 600) } })
 }
 
@@ -574,12 +581,11 @@ async function oauthCallback(req: Request, env: Env, url: URL, provider: OAuthPr
       const info = (await ur.json()) as { email?: string; email_verified?: boolean }
       email = info.email_verified ? info.email ?? null : null
     } else {
-      const tr = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID!, client_secret: env.DISCORD_CLIENT_SECRET!, grant_type: 'authorization_code', code, redirect_uri: redirect }) })
+      const tr = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID!, client_secret: env.DISCORD_CLIENT_SECRET!, code, redirect_uri: redirect, grant_type: 'authorization_code' }) })
       const { access_token } = (await tr.json()) as { access_token?: string }
       if (!access_token) return fail('token')
-      const ur = await fetch('https://discord.com/api/users/@me', { headers: { authorization: `Bearer ${access_token}` } })
-      const info = (await ur.json()) as { email?: string; verified?: boolean }
-      email = info.verified === false ? null : info.email ?? null
+      const ur = await fetch('https://discord.com/api/users/@me', { headers: { authorization: `Bearer ${access_token}`, 'user-agent': 'tongkrongan' } })
+      email = discordVerifiedEmail((await ur.json()) as { email?: string | null; verified?: boolean })
     }
   } catch { return fail('provider') }
   if (!email) return fail('email')
