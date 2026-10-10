@@ -3,6 +3,7 @@ import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, cookie, clientIp, hashPassword, json, randomHex, rateLimit, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
 import { runCron } from './cron'
+import { notifyClaimActive, notifyVercelConnected } from './notify'
 import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
 
 const SESSION_DAYS = 30
@@ -276,6 +277,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const tok = await exchangeCode(env, code)
     if (!tok) throw new HttpError(400, 'vercel_error')
     await saveConnection(env, u.id, tok.token, tok.teamId)
+    await notifyVercelConnected(env, u.email)
     const next = url.searchParams.get('next')
     let dest = '/claim?vercel=1'
     try { if (next && new URL(next).hostname.endsWith('vercel.com')) dest = next } catch { /* abaikan */ }
@@ -400,6 +402,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
       await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(Date.now(), s.name).run()
       await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, 1, ?)').bind(s.name, Date.now()).run()
       await historyAdd(env, s.name, 'h.active')
+      if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform, u.email)
     } else {
       await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = ? WHERE name = ?").bind(r.reason, s.name).run()
       await historyAdd(env, s.name, 'h.failed', r.reason)

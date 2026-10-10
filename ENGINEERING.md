@@ -162,6 +162,14 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Penyesuaian tampilan mengikuti jumlah entri: array variasi `borderRadius`/`height` di `Home.tsx` dari 5 ke 6 entri (nilai lama dipertahankan, 1 entri baru disisipkan pada index github), dan grid kartu wizard di `Claim.tsx` dari `lg:grid-cols-5` ke `lg:grid-cols-3` agar 6 kartu menjadi 3+3, bukan 5+1.
 - Verifikasi: `npm run build` lulus (tsc frontend + worker + vite); `node scripts/contrast.mjs` lulus AA; uji lokal mode mock — buat subdomain `platform: "github"` tipe CNAME sukses, `github` + tipe `A` ditolak, platform tak dikenal ditolak.
 
+### 2026-10-11, notifikasi Discord (agent: Claude Sonnet 5.5)
+
+- Branch `feat/discord-notifikasi`. Webhook Discord (bot tampil sebagai **Mas DNS**) mengirim embed ke channel saat: (1) pengguna menyelesaikan OAuth Vercel (`GET /api/vercel/callback`), (2) subdomain **pertama kali** berstatus `active`, baik lewat `POST /api/subdomains/:name/verify` maupun Cron. Berlaku untuk semua platform, karena semuanya lewat dua jalur aktivasi itu; pesan memuat nama platform. Tidak dikirim ulang bila domain turun lalu aktif lagi (dicek lewat `activated_at`).
+- Berkas baru `worker/notify.ts` (`notifyDiscord`, `notifyVercelConnected`, `notifyClaimActive`). Tanpa `DISCORD_WEBHOOK_URL` tidak ada request keluar. Batas waktu 3 detik, galat hanya dicatat ke log sehingga permintaan pengguna tidak ikut gagal. Mention Discord dimatikan (`allowed_mentions`). Email disamarkan (`bu***@mail.com`); dari Cron pesan tanpa baris akun.
+- Variabel baru `DISCORD_WEBHOOK_URL` (secret, bukan `vars`): lokal di `.dev.vars` (di-gitignore), produksi lewat `npx wrangler secret put DISCORD_WEBHOOK_URL`. Contohnya ditambahkan di `.dev.vars.example`. **URL webhook tidak boleh masuk commit.** Bila bocor, hapus webhook di Discord dan buat baru; menghapus commit tidak cukup.
+- Tes baru `tests/notify.test.ts` (4 tes: tanpa URL tidak mengirim, domain lengkap dan email tersamarkan, email utuh tidak bocor, galat Discord tidak melempar).
+
+
 ### Backlog yang disarankan
 1. og:image dari logo (logo sudah terpasang di navbar, footer, favicon).
 2. Perbarui PRD.md ke ejaan "tongkrongan".

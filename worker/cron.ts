@@ -1,5 +1,6 @@
 import { deleteRecord, flaggedBySafeBrowsing, healthCheck, verifyRecord } from './dns'
 import type { Env } from './lib'
+import { notifyClaimActive } from './notify'
 import { getConnection, verifyProjectDomain } from './vercel'
 import type { RecordType } from '../src/lib/dns'
 
@@ -40,6 +41,7 @@ export async function runCron(env: Env) {
     if (r.ok) {
       await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(now, s.name).run()
       await hist(env, s.name, 'h.active')
+      if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform)
     }
   }
 

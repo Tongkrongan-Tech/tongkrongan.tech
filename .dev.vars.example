@@ -3,3 +3,5 @@
 DNS_MODE=mock
 BASE_DOMAIN=tongkrongan.tech
 ADMIN_TOKEN=ganti-dengan-string-acak-panjang
+# Opsional: notifikasi ke channel Discord saat user konek Vercel / domain berhasil diklaim.
+# DISCORD_WEBHOOK_URL=
