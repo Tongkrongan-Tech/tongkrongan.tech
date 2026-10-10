@@ -1,5 +1,17 @@
 # tongkrongan.tech
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/xyyxzxx/tongkrongan.tech/actions/workflows/ci.yml/badge.svg)](https://github.com/xyyxzxx/tongkrongan.tech/actions/workflows/ci.yml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Kontributor](https://img.shields.io/github/contributors/xyyxzxx/tongkrongan.tech)](CONTRIBUTORS.md)
+[![Situs](https://img.shields.io/badge/situs-tongkrongan.tech-blue)](https://tongkrongan.tech)
+
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+
 Subdomain gratis untuk pelajar, kreator, UMKM, dan developer. Pilih nama, tentukan tujuan, dan alamat aktif dalam beberapa menit. Layanan ini hanya mengelola DNS, sementara website tetap berjalan di Cloudflare, Railway, Vercel, VPS, atau hosting lain milik pengguna.
 
 Situs: https://tongkrongan.tech
@@ -17,6 +29,7 @@ Status: dalam pengembangan aktif.
 - Perintah npm
 - Dokumentasi
 - Kontribusi
+- Kontributor
 - Keamanan
 - Lisensi
 
@@ -124,6 +137,12 @@ Ringkasnya:
 - Judul commit mengikuti Conventional Commits.
 - Tandai pull request yang masih dikerjakan sebagai Draft.
 - Sebelum mengerjakan sebuah issue, tulis komentar lebih dulu.
+
+## Kontributor
+
+Terima kasih untuk semua yang sudah membantu project ini. Profil kontributor ada di CONTRIBUTORS.md.
+
+[![Kontributor](https://contrib.rocks/image?repo=xyyxzxx/tongkrongan.tech)](https://github.com/xyyxzxx/tongkrongan.tech/graphs/contributors)
 
 ## Keamanan
 
