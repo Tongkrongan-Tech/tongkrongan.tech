@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePrefs } from '../lib/prefs'
 import { api } from '../lib/api'
 import { Spinner } from '../components/ui'
@@ -14,12 +14,14 @@ export function ResetPassword() {
   const [busy, setBusy] = useState(false)
   useEffect(() => { document.title = `${t('reset.h')} | Tongkrongan.tech` }, [t])
 
+  const token = qs.get('token')
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (pw.length < 8) { setErr(t('login.err.pw')); return }
     setBusy(true); setErr('')
     try {
-      await api('/auth/reset', { body: { token: qs.get('token') ?? '', password: pw } })
+      await api('/auth/reset', { body: { token, password: pw } })
       nav('/login?reset=1', { replace: true })
     } catch (ex) { setErr(te(ex)) }
     setBusy(false)
@@ -28,6 +30,12 @@ export function ResetPassword() {
   return (
     <div className="mx-auto max-w-md px-4 py-12 sm:py-20">
       <h1 className="text-4xl font-extrabold leading-tight tracking-tight">{t('reset.h')}</h1>
+      {!token ? (
+        <div className="card mt-8 grid gap-4 p-6" style={{ boxShadow: 'var(--shadow)' }}>
+          <p role="alert" className="font-semibold" style={{ color: 'var(--bad)' }}>{t('reset.notoken')}</p>
+          <Link to="/login?forgot=1" className="btn btn-primary no-underline">{t('reset.notoken.link')}</Link>
+        </div>
+      ) : (
       <form onSubmit={submit} noValidate className="card mt-8 grid gap-5 p-6" style={{ boxShadow: 'var(--shadow)' }}>
         <div>
           <label htmlFor="npw" className="label">{t('login.pw')}</label>
@@ -39,6 +47,7 @@ export function ResetPassword() {
         <p role="alert" className="min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{err}</p>
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? <Spinner /> : t('reset.submit')}</button>
       </form>
+      )}
     </div>
   )
 }

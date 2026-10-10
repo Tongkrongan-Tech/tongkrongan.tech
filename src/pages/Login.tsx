@@ -13,7 +13,7 @@ export function Login() {
   const nav = useNavigate()
   const [qs] = useSearchParams()
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/dashboard'
-  const [mode, setMode] = useState<'in' | 'up' | 'forgot' | 'otp'>('in')
+  const [mode, setMode] = useState<'in' | 'up' | 'forgot' | 'otp'>(qs.get('forgot') ? 'forgot' : 'in')
   const [code, setCode] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState('')
