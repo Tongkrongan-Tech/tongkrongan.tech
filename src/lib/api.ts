@@ -5,19 +5,19 @@ export class ApiError extends Error {
 export interface Config {
   baseDomain: string
   quota: number
-  oauth: { github: boolean; google: boolean }
+  oauth: { github: boolean; google: boolean; discord?: boolean }
   turnstileSiteKey: string | null
   emailVerify: boolean
   vercelConnect?: boolean
   mock: boolean
 }
 
-export async function api<T = unknown>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function api<T = unknown>(path: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<T> {
   let res: Response
   try {
     res = await fetch(`/api${path}`, {
       method: init?.method ?? (init?.body ? 'POST' : 'GET'),
-      headers: init?.body ? { 'content-type': 'application/json' } : init?.method && init.method !== 'GET' ? { 'content-type': 'application/json' } : undefined,
+      headers: { ...(init?.body || (init?.method && init.method !== 'GET') ? { 'content-type': 'application/json' } : {}), ...init?.headers },
       body: init?.body ? JSON.stringify(init.body) : undefined,
       credentials: 'same-origin',
     })

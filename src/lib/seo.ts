@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom'
 export const SITE = 'https://tongkrongan.tech'
 export const HOME_TITLE = 'tongkrongan.tech | Subdomain gratis untuk project kamu'
 // Harus sama dengan public/sitemap.xml. Halaman lain (dashboard, login, reset, 404) tidak diindeks.
-export const INDEXABLE = ['/', '/claim', '/report']
+export const INDEXABLE = ['/', '/claim', '/report', '/terms', '/privacy']
 
 function upsert(selector: string, create: () => HTMLElement, set: (el: HTMLElement) => void) {
   let el = document.head.querySelector<HTMLElement>(selector)

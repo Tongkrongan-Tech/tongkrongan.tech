@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
@@ -7,12 +7,14 @@ import { PrefsProvider } from './lib/prefs'
 import { StoreProvider } from './lib/store'
 import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
-import { Claim } from './pages/Claim'
-import { Dashboard } from './pages/Dashboard'
-import { Login } from './pages/Login'
-import { ResetPassword } from './pages/ResetPassword'
-import { Report } from './pages/Report'
-import { NotFound } from './pages/NotFound'
+const Claim = lazy(() => import('./pages/Claim').then((m) => ({ default: m.Claim })))
+const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })))
+const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })))
+const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })))
+const Report = lazy(() => import('./pages/Report').then((m) => ({ default: m.Report })))
+const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })))
+const Legal = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Legal })))
+const NotFound = lazy(() => import('./pages/NotFound').then((m) => ({ default: m.NotFound })))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -28,6 +30,9 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="login" element={<Login />} />
                 <Route path="reset" element={<ResetPassword />} />
                 <Route path="report" element={<Report />} />
+                <Route path="admin" element={<Admin />} />
+                <Route path="terms" element={<Legal doc="terms" />} />
+                <Route path="privacy" element={<Legal doc="privacy" />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
