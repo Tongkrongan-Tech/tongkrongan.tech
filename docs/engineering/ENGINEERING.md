@@ -175,9 +175,16 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Variabel baru `DISCORD_WEBHOOK_URL` (secret, bukan `vars`): lokal di `.dev.vars` (di-gitignore), produksi lewat `npx wrangler secret put DISCORD_WEBHOOK_URL`. Contohnya ditambahkan di `.dev.vars.example`. **URL webhook tidak boleh masuk commit.** Bila bocor, hapus webhook di Discord dan buat baru; menghapus commit tidak cukup.
 - Tes baru `tests/notify.test.ts` (4 tes: tanpa URL tidak mengirim, domain lengkap dan email tersamarkan, email utuh tidak bocor, galat Discord tidak melempar).
 
+### 2026-10-11, perbaikan SEO dan banner og:image (agent: Claude Sonnet 5.5)
+- Banner buatan pemilik (PNG 1734x907, 1,35 MB) diubah ke JPEG 1200x630 kualitas 85 menjadi `public/og-banner.jpg` (150 KB, turun sekitar 89%). JPEG dipilih karena WhatsApp, Facebook, dan X tidak andal membaca WebP; batas aman pratinjau sekitar 300 KB. Berkas PNG asli tidak disimpan di repo.
+- `index.html`: judul dan deskripsi diperketat (judul 53, deskripsi 128 karakter), `robots`, `theme-color`, `canonical`, Open Graph lengkap (`og:image` mutlak + lebar, tinggi, alt, `og:locale` id_ID dengan alternatif en_US), Twitter Card `summary_large_image`, dan JSON-LD `WebSite` + `Organization`. Tanpa `FAQPage` karena isi FAQ dwibahasa dan bisa berubah.
+- `public/robots.txt` (blokir `/api/`, tautkan sitemap) dan `public/sitemap.xml` (`/`, `/claim`, `/report`). Halaman privat sengaja **tidak** di-Disallow di robots.txt: bila diblokir, crawler tidak bisa membaca `noindex`-nya.
+- `src/lib/seo.ts` (`useRouteSeo`, dipasang di `Layout`): meta `robots` dan `canonical` mengikuti rute; selain `/`, `/claim`, `/report` (dashboard, login, reset, 404) menjadi `noindex, nofollow`. Memperbaiki judul tab yang tertinggal saat kembali ke beranda dari halaman lain. Daftar `INDEXABLE` harus sama dengan sitemap.
+- `tests/seo.test.ts` (4 tes): og:image mutlak dan di bawah 300 KB, panjang judul/deskripsi, konsistensi canonical/robots/sitemap/INDEXABLE, JSON-LD valid. Uji: 18/18 lulus, build lulus (Node 24).
+- Catatan: tag di `index.html` memakai domain `https://tongkrongan.tech` yang ditulis langsung; ubah bila `BASE_DOMAIN` produksi berganti. Teks di banner campur Indonesia (judul) dan Inggris (chip platform). Titik kecil di bawah huruf "a" pada "tongkronganmu" di banner adalah artefak generator gambar. Belum dilakukan: uji pratinjau di debugger Facebook/X/WhatsApp dan kirim sitemap ke Google Search Console (butuh domain live).
 
 ### Backlog yang disarankan
-1. og:image dari logo (logo sudah terpasang di navbar, footer, favicon).
+1. Ganti banner ke versi tanpa artefak titik pada "tongkronganmu", lalu uji pratinjau tautan di WhatsApp dan debugger Facebook.
 2. Perbarui PRD.md ke ejaan "tongkrongan".
 3. Uji semua jalur live setelah deploy pertama (SETUP.md bagian 6); perbaiki apa yang gagal.
 4. Halaman Syarat Layanan dan Privasi (belum ada, jadi tidak ditautkan); wajib sebelum publik memakai.

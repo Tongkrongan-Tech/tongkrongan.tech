@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs, THEMES, type Theme } from '../lib/prefs'
 import { useStore } from '../lib/store'
+import { useRouteSeo } from '../lib/seo'
 import { Icon } from './ui'
 
 const SWATCH: Record<Theme, [string, string]> = {
@@ -75,6 +76,7 @@ export function Layout() {
   const { user, logout } = useStore()
   const [menu, setMenu] = useState(false)
   const loc = useLocation()
+  useRouteSeo()
 
   useEffect(() => { setMenu(false) }, [loc.pathname])
   useEffect(() => {
