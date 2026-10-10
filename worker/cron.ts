@@ -1,8 +1,9 @@
 import { deleteRecord, flaggedBySafeBrowsing, healthCheck, verifyRecord } from './dns'
 import type { Env } from './lib'
+import { getConnection, verifyProjectDomain } from './vercel'
 import type { RecordType } from '../src/lib/dns'
 
-type Row = { name: string; type: RecordType; value: string; cf_record_id: string | null; txt_record_id: string | null; status: string; created_at: number; activated_at: number | null }
+type Row = { name: string; user_id: string; platform: string; vercel_project: string | null; type: RecordType; value: string; cf_record_id: string | null; txt_record_id: string | null; status: string; created_at: number; activated_at: number | null }
 const DAY = 864e5
 
 async function hist(env: Env, name: string, key: string, detail?: string) {
@@ -29,6 +30,11 @@ export async function runCron(env: Env) {
   // 2. Coba verifikasi ulang yang masih menunggu.
   const waiting = await env.DB.prepare("SELECT * FROM subdomains WHERE status IN ('pending','failed') AND created_at >= ? ORDER BY last_check_at LIMIT 20").bind(now - DAY).all<Row>()
   for (const s of waiting.results) {
+    // Vercel hanya mengecek TXT saat diminta, jadi dorong verifikasinya lagi sekarang setelah DNS menyebar.
+    if (s.platform === 'vercel' && s.vercel_project) {
+      const conn = await getConnection(env, s.user_id).catch(() => null)
+      if (conn) await verifyProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
+    }
     const r = await verifyRecord(env, s)
     await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ?').bind(now, s.name).run()
     if (r.ok) {
