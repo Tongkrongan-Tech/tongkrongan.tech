@@ -67,7 +67,7 @@ Satu Worker Cloudflare menyajikan frontend dan API. Saat pengguna mengklaim nama
 
 ## Menjalankan di lokal
 
-Prasyarat: Node.js 20 atau versi lebih baru.
+Prasyarat: Node.js 22.6 atau versi lebih baru. Nomor versi yang dipakai CI tertulis di `.nvmrc`.
 
 ```bash
 git clone https://github.com/xyyxzxx/tongkrongan.tech.git
@@ -112,6 +112,7 @@ Langkah lengkap ada di docs/ops/SETUP.md.
 | npm run dev | Menjalankan frontend Vite di port 5173 |
 | npm run dev:api | Menjalankan Worker di port 8787 |
 | npm run build | Tipe check frontend dan worker, lalu build Vite |
+| npm test | Menjalankan seluruh tes di folder tests |
 | npm run preview | Pratinjau hasil build |
 | npm run db:local | Menerapkan migrasi D1 ke database lokal |
 | npm run db:remote | Menerapkan migrasi D1 ke database produksi |
