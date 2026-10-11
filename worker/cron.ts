@@ -55,8 +55,9 @@ export async function runCron(env: Env) {
   }
 
   // 3. Health check subdomain aktif, dan subdomain gagal (down) supaya bisa pulih sendiri.
-  const active = await env.DB.prepare("SELECT name, status FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason = 'down') ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string }>()
-  for (const { name, status } of active.results) {
+  const active = await env.DB.prepare("SELECT name, status, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason IN ('down', 'takeover')) ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string; cf_record_id: string | null; txt_record_id: string | null }>()
+  for (const s of active.results) {
+    const { name, status } = s
     const ok = await healthCheck(env, name)
     await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, ?, ?)').bind(name, ok ? 1 : 0, now).run()
     await env.DB.prepare('DELETE FROM checks WHERE name = ? AND id NOT IN (SELECT id FROM checks WHERE name = ? ORDER BY id DESC LIMIT 30)').bind(name, name).run()
@@ -68,8 +69,14 @@ export async function runCron(env: Env) {
     } else {
       const last = await env.DB.prepare('SELECT ok FROM checks WHERE name = ? ORDER BY id DESC LIMIT 5').bind(name).all<{ ok: number }>()
       if (last.results.length === 5 && last.results.every((x) => !x.ok)) {
-        await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = 'down' WHERE name = ?").bind(name).run()
-        await hist(env, name, 'h.failed', 'down')
+        try {
+          if (s.cf_record_id) await deleteRecord(env, s.cf_record_id)
+          if (s.txt_record_id) await deleteRecord(env, s.txt_record_id)
+        } catch (err) {
+          console.error('failed deleting dns on takeover', s.name, err)
+        }
+        await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = 'takeover', cf_record_id = NULL, txt_record_id = NULL WHERE name = ?").bind(name).run()
+        await hist(env, name, 'h.failed', 'takeover')
       }
     }
   }

@@ -457,7 +457,17 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     }
     const r = await verifyRecord(env, s)
     if (r.ok) {
-      await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(Date.now(), s.name).run()
+      let cfRecordId = s.cf_record_id
+      let txtRecordId = s.txt_record_id
+      if (!cfRecordId) {
+        cfRecordId = await createRecord(env, hostOf(env, s.name), s.type, s.value)
+      }
+      if (s.txt_label && s.txt_value && !txtRecordId) {
+        txtRecordId = await createRecord(env, txtHost(env, s.txt_label, s.name), 'TXT', s.txt_value)
+      }
+      await env.DB.prepare(
+        "UPDATE subdomains SET status = 'active', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, activated_at = COALESCE(activated_at, ?) WHERE name = ?"
+      ).bind(cfRecordId, txtRecordId, Date.now(), s.name).run()
       await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, 1, ?)').bind(s.name, Date.now()).run()
       await historyAdd(env, s.name, 'h.active')
       if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform, u.email)
