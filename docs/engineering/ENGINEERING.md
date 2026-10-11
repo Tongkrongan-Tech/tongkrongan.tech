@@ -247,6 +247,11 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Uji: `tests/admin.test.ts` (alasan UI sama dengan `REASONS` backend, rute info ada sesudah pemeriksaan token, halaman tidak ditautkan dan tidak di sitemap); 35/35 tes, build, kontras AA lulus. Diuji di browser dan Worker lokal dengan akun/subdomain/laporan uji (dihapus sesudahnya): token salah ditolak, daftar, periksa, batal konfirmasi, tangguhkan (status `suspended`), blokir pemilik, tandai selesai, keluar (token hilang dari sesi); tanpa token semua endpoint admin 401.
 - **Belum dari issue #40:** daftar subdomain yang ditandai `h.needsReview` untuk ditinjau manusia. Entri riwayat itu dibuat backend di PR #31 (belum di-merge) dan belum ada endpoint untuk mendaftarkannya; tambahkan setelah #31 masuk. Juga belum ada "buka blokir" atau "pulihkan subdomain" (API-nya pun belum ada).
 
+### 2026-10-11, teks riwayat h.needsReview, issue #33 (agent: Udin)
+- `src/lib/dict.ts` mendapat kunci `h.needsReview` ("Menunggu tinjauan manual" / "Awaiting manual review"). Tanpa kunci ini dasbor menampilkan nama kunci mentah kepada pengguna: `worker/cron.ts` menulis riwayat itu untuk nama yang menyerupai merek, sementara `src/pages/Dashboard.tsx` merendernya lewat `t(h.key)`.
+- Tes baru `tests/dict.test.ts` menutup kebocoran serupa: (1) setiap literal `h.*` yang dipakai di `worker/` dan `src/` wajib punya entri di dict, (2) tiap kunci riwayat harus berisi teks ID dan EN yang tidak kosong. Pemecahan nilai memakai pemindai tanda kutip agar nilai yang memuat koma (mis. `hero.sub`) tetap dihitung dua bagian, bukan salah baca.
+- Uji: sebelum diperbaiki tes gagal tepat pada `kunci riwayat tanpa terjemahan: h.needsReview`; sesudahnya 43/43 tes, `npm run build`, dan kontras AA lulus.
+
 ### Backlog yang disarankan
 1. Ganti banner ke versi tanpa artefak titik pada "tongkronganmu", lalu uji pratinjau tautan di WhatsApp dan debugger Facebook.
 2. Perbarui PRD.md ke ejaan "tongkrongan".
