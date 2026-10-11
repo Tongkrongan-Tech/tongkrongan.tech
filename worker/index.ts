@@ -242,7 +242,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
     const u = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first<{ id: string; pw_hash: string | null; pw_salt: string | null; verified: number; blocked: number }>()
     const stored = u?.pw_hash ? parsePasswordHash(u.pw_hash) : null
-    const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16), stored?.iterations ?? PBKDF2_ITERATIONS)
+    const attempt = await hashPassword(String(b.password ?? ''), u?.pw_salt ?? '00'.repeat(16), Math.min(stored?.iterations ?? PBKDF2_ITERATIONS, PBKDF2_ITERATIONS))
     if (!u || !u.pw_hash || !stored || !safeEqual(attempt.slice(attempt.indexOf('$') + 1), stored.hash)) {
       await rateLimit(env, `lock:${email}`, 10, 900)
       throw new HttpError(401, 'invalid_credentials')
