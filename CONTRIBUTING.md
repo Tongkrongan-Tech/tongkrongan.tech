@@ -73,8 +73,11 @@ Tambahkan fitur di tempat yang sesuai agar konflik merge tetap kecil. Jangan men
 
 ## Pemeriksaan sebelum mengirim
 
+Gunakan Node versi `.nvmrc` atau lebih baru; tes membutuhkan Node 22.6 ke atas.
+
 ```bash
 npm ci
+npm test
 npm run build
 node scripts/contrast.mjs
 ```
