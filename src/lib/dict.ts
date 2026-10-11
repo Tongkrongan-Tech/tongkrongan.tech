@@ -327,6 +327,7 @@ export const dict: Record<string, [string, string]> = {
   'claim.created': ['Record {type} sudah dibuat di DNS. Propagasi biasanya beberapa menit.', 'The {type} record is created in DNS. Propagation usually takes a few minutes.'],
   'claim.failed': ['Verifikasi belum berhasil', 'Verification did not pass'],
   'val.dns': ['DNS belum menjawab sesuai record. Ini normal di menit-menit awal (propagasi). Pastikan nilai record benar dan tunggu sebentar.', 'DNS has not answered with the record yet. Wait a few minutes for propagation, check the value is right, then try again.'],
+  'val.takeover': ['Situsmu berhenti merespons, jadi record DNS-nya kami bekukan demi keamanan (mencegah pengambilalihan subdomain). Perbaiki situs atau tujuan, lalu klik verifikasi untuk memulihkannya.', 'Your site stopped responding, so we froze its DNS records for safety (to prevent subdomain takeover). Fix the site or destination, then click verify to restore it.'],
   'val.down': ['Situsmu berhenti merespons pada beberapa pengecekan berturut-turut. Perbaiki situs atau tujuan, lalu verifikasi ulang.', 'Your site stopped responding on several consecutive checks. Fix the site or destination, then verify again.'],
   'val.suspended': ['Subdomain ini ditangguhkan karena pelanggaran.', 'This subdomain was suspended for a violation.'],
   // galat dari API

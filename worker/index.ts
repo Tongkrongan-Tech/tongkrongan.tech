@@ -451,6 +451,23 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
     if (Date.now() - s.last_check_at < 8000) throw new HttpError(429, 'too_fast')
     await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ?').bind(Date.now(), s.name).run()
+    // Subdomain yang DNS-nya dibekukan Cron (takeover): verifikasi mustahil lolos tanpa record, jadi buat ulang dulu,
+    // lalu kembali ke pending agar Cron yang memverifikasi setelah DNS menyebar.
+    if (s.status === 'failed' && s.fail_reason === 'takeover' && !s.cf_record_id) {
+      let rid: string | null = null
+      let tid: string | null = null
+      try {
+        rid = await createRecord(env, hostOf(env, s.name), s.type, s.value)
+        if (s.txt_label && s.txt_value) tid = await createRecord(env, txtHost(env, s.txt_label, s.name), 'TXT', s.txt_value)
+      } catch (e) {
+        console.error('createRecord gagal saat pulih dari takeover', s.name, e)
+        await deleteRecord(env, rid).catch(() => {})
+        throw new HttpError(502, 'dns_provider')
+      }
+      await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0 WHERE name = ?").bind(rid, tid, s.name).run()
+      await historyAdd(env, s.name, 'h.restored')
+      return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
+    }
     if (s.platform === 'vercel' && s.vercel_project) {
       const conn = await getConnection(env, u.id).catch(() => null)
       if (conn) await verifyProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
