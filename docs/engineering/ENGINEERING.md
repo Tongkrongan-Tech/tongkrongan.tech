@@ -14,6 +14,7 @@ cp .dev.vars.example .dev.vars   # DNS_MODE=mock
 npm run db:local                 # migrasi D1 lokal
 npm run dev:api                  # Worker :8787
 npm run dev                      # Vite :5173 (proxy /api ke :8787)
+npm test                         # seluruh tes di tests/ (butuh Node 22.6+, lihat .nvmrc)
 npm run build                    # tsc (frontend + worker) + vite build
 node scripts/contrast.mjs        # kontras WCAG AA semua tema
 ```
@@ -246,6 +247,12 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Backend: satu rute baru `GET /api/admin/subdomains/:name` di `admin()` (`worker/index.ts`), berada sesudah pemeriksaan token, mengembalikan data subdomain dan `owner_email`/`owner_blocked`. Tanpa rute ini, memblokir pelaku butuh mencari email pemilik di luar UI. `src/lib/api.ts` kini menerima `headers` opsional. **Catatan merge:** PR #29/#30 juga mengubah `worker/index.ts`; rute ini berdiri sendiri di dalam `admin()` jadi seharusnya mudah digabung.
 - Uji: `tests/admin.test.ts` (alasan UI sama dengan `REASONS` backend, rute info ada sesudah pemeriksaan token, halaman tidak ditautkan dan tidak di sitemap); 35/35 tes, build, kontras AA lulus. Diuji di browser dan Worker lokal dengan akun/subdomain/laporan uji (dihapus sesudahnya): token salah ditolak, daftar, periksa, batal konfirmasi, tangguhkan (status `suspended`), blokir pemilik, tandai selesai, keluar (token hilang dari sesi); tanpa token semua endpoint admin 401.
 - **Belum dari issue #40:** daftar subdomain yang ditandai `h.needsReview` untuk ditinjau manusia. Entri riwayat itu dibuat backend di PR #31 (belum di-merge) dan belum ada endpoint untuk mendaftarkannya; tambahkan setelah #31 masuk. Juga belum ada "buka blokir" atau "pulihkan subdomain" (API-nya pun belum ada).
+
+### 2026-10-11, CI menjalankan tes dan syarat Node diseragamkan, issue #57 (agent: Udin)
+- `.github/workflows/ci.yml`: `node-version: 20` diganti `node-version-file: .nvmrc`, dan langkah `jalankan npm test` disisipkan sebelum `npm run build`. Sebelumnya 41 tes di `tests/` tidak pernah dijalankan CI, jadi regresi bisa lolos ke `main` tanpa terdeteksi.
+- Berkas baru `.nvmrc` (isi `22`) sebagai satu sumber versi Node untuk CI dan kontributor. `package.json` mendapat `engines: { "node": ">=22.6" }`, karena `npm test` memakai `--experimental-strip-types` yang baru tersedia di Node 22.6; npm memberi peringatan bila dipakai versi lebih lama. Kecocokan ini dibuktikan dengan `npx -y node@20 --experimental-strip-types` yang membalas `node: bad option: --experimental-strip-types`.
+- Dokumen disesuaikan agar tidak saling bertentangan: `README.md` prasyarat dari "Node.js 20" menjadi "Node.js 22.6" dan tabel perintah npm kini memuat `npm test`; `CONTRIBUTING.md` menambah `npm test` ke daftar pemeriksaan sebelum mengirim.
+- Uji di lokal (Node 22.23.1): `npm test` 41/41 lulus, `npm run build` lulus, `node scripts/contrast.mjs` lulus. **Belum diuji:** jalannya workflow itu sendiri di GitHub Actions; kegagalan pertamanya setelah PR digabung justru akan terbaca dari halaman Actions.
 
 ### Backlog yang disarankan
 1. Ganti banner ke versi tanpa artefak titik pada "tongkronganmu", lalu uji pratinjau tautan di WhatsApp dan debugger Facebook.
