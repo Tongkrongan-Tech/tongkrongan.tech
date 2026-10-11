@@ -13,7 +13,7 @@ const SWATCH: Record<Theme, [string, string]> = {
 export function Logo() {
   return (
     <Link to="/" className="inline-flex items-center no-underline" aria-label="Tongkrongan.tech">
-      <img src="/logo-wordmark.png" alt="Tongkrongan.tech" width="640" height="83" className="logo-art h-6 w-auto sm:h-7" />
+      <img src="/logo-wordmark.png" alt="Tongkrongan.tech" width="640" height="77" className="logo-art h-6 w-auto sm:h-7" />
     </Link>
   )
 }
@@ -165,7 +165,7 @@ function Footer() {
       <div className="mx-auto max-w-6xl px-4 pb-8 pt-12 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.6fr_2fr]">
           <div>
-            <img src="/logo-full.png" alt="Tongkrongan.tech, subdomain gratis untuk project kamu" width="720" height="468" loading="lazy" className="logo-art h-auto w-44" />
+            <img src="/logo-full.png" alt="Tongkrongan.tech, subdomain gratis untuk project kamu" width="720" height="428" loading="lazy" className="logo-art h-auto w-44" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{t('footer.about')}</p>
           </div>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
