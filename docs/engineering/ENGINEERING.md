@@ -253,6 +253,10 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Berkas baru `.nvmrc` (isi `22`) sebagai satu sumber versi Node untuk CI dan kontributor. `package.json` mendapat `engines: { "node": ">=22.6" }`, karena `npm test` memakai `--experimental-strip-types` yang baru tersedia di Node 22.6; npm memberi peringatan bila dipakai versi lebih lama. Kecocokan ini dibuktikan dengan `npx -y node@20 --experimental-strip-types` yang membalas `node: bad option: --experimental-strip-types`.
 - Dokumen disesuaikan agar tidak saling bertentangan: `README.md` prasyarat dari "Node.js 20" menjadi "Node.js 22.6" dan tabel perintah npm kini memuat `npm test`; `CONTRIBUTING.md` menambah `npm test` ke daftar pemeriksaan sebelum mengirim.
 - Uji di lokal (Node 22.23.1): `npm test` 41/41 lulus, `npm run build` lulus, `node scripts/contrast.mjs` lulus. **Belum diuji:** jalannya workflow itu sendiri di GitHub Actions; kegagalan pertamanya setelah PR digabung justru akan terbaca dari halaman Actions.
+### 2026-10-11, teks riwayat h.needsReview, issue #33 (agent: Udin)
+- `src/lib/dict.ts` mendapat kunci `h.needsReview` ("Menunggu tinjauan manual" / "Awaiting manual review"). Tanpa kunci ini dasbor menampilkan nama kunci mentah kepada pengguna: `worker/cron.ts` menulis riwayat itu untuk nama yang menyerupai merek, sementara `src/pages/Dashboard.tsx` merendernya lewat `t(h.key)`.
+- Tes baru `tests/dict.test.ts` menutup kebocoran serupa: (1) setiap literal `h.*` yang dipakai di `worker/` dan `src/` wajib punya entri di dict, (2) tiap kunci riwayat harus berisi teks ID dan EN yang tidak kosong. Pemecahan nilai memakai pemindai tanda kutip agar nilai yang memuat koma (mis. `hero.sub`) tetap dihitung dua bagian, bukan salah baca.
+- Uji: sebelum diperbaiki tes gagal tepat pada `kunci riwayat tanpa terjemahan: h.needsReview`; sesudahnya 43/43 tes, `npm run build`, dan kontras AA lulus.
 
 ### Backlog yang disarankan
 1. Ganti banner ke versi tanpa artefak titik pada "tongkronganmu", lalu uji pratinjau tautan di WhatsApp dan debugger Facebook.
