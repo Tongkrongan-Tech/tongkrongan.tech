@@ -511,6 +511,12 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
     const rows = await env.DB.prepare("SELECT * FROM reports WHERE status = 'open' ORDER BY at").all()
     return json({ reports: rows.results })
   }
+  // Antrean tinjauan: subdomain yang ditandai Cron karena namanya menyerupai merek atau tokoh.
+  // Penandaannya tersimpan di history (sekali, tidak pernah dihapus), jadi daftar ini bersifat kumulatif.
+  if (req.method === 'GET' && url.pathname === '/api/admin/reviews') {
+    const rows = await env.DB.prepare("SELECT s.name, s.platform, s.type, s.value, s.status, s.activated_at, u.email AS owner_email, u.blocked AS owner_blocked, (SELECT MIN(h.at) FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') AS flagged_at FROM subdomains s JOIN users u ON u.id = s.user_id WHERE EXISTS (SELECT 1 FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') ORDER BY flagged_at DESC LIMIT 200").all()
+    return json({ reviews: rows.results })
+  }
   const resolve = url.pathname.match(/^\/api\/admin\/reports\/(\w+)\/resolve$/)
   if (req.method === 'POST' && resolve) {
     await env.DB.prepare("UPDATE reports SET status = 'resolved' WHERE id = ?").bind(resolve[1]).run()
@@ -532,6 +538,32 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
     if (!u) throw new HttpError(404, 'not_found')
     await env.DB.batch([env.DB.prepare('UPDATE users SET blocked = 1 WHERE id = ?').bind(u.id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(u.id)])
     return json({ ok: true })
+  }
+  // Kebalikan dari block. Sesi tidak dipulihkan karena sudah dihapus saat memblokir; pengguna cukup masuk lagi.
+  if (req.method === 'POST' && url.pathname === '/api/admin/unblock') {
+    const { email } = await readBody<{ email: string }>(req)
+    const u = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(String(email).toLowerCase()).first<{ id: string }>()
+    if (!u) throw new HttpError(404, 'not_found')
+    await env.DB.prepare('UPDATE users SET blocked = 0 WHERE id = ?').bind(u.id).run()
+    return json({ ok: true })
+  }
+  // Kebalikan dari suspend: suspend menghapus record DNS dan mengosongkan cf_record_id,
+  // jadi record dibuat ulang dari nilai yang masih tersimpan, lalu status kembali pending
+  // agar diverifikasi ulang lewat jalur yang sama seperti klaim biasa (UI atau Cron).
+  if (req.method === 'POST' && url.pathname === '/api/admin/restore') {
+    const { name } = await readBody<{ name: string }>(req)
+    const s = await env.DB.prepare('SELECT * FROM subdomains WHERE name = ?').bind(String(name).toLowerCase()).first<SubRow>()
+    if (!s) throw new HttpError(404, 'not_found')
+    if (s.status !== 'suspended') throw new HttpError(409, 'not_suspended')
+    const rid = await createRecord(env, hostOf(env, s.name), s.type, s.value)
+    const tid = s.txt_label && s.txt_value ? await createRecord(env, txtHost(env, s.txt_label, s.name), 'TXT', s.txt_value) : null
+    // Cron melepas subdomain yang belum pernah aktif 24 jam setelah created_at, lengkap dengan baris dan riwayatnya.
+    // Menangguhkan status menyembunyikan baris dari aturan itu, jadi tanpa penyesuaian restore akan langsung
+    // dilepas lagi pada putaran berikutnya. Untuk yang belum pernah aktif, jendela verifikasi dimulai ulang.
+    const windowStart = s.activated_at ? s.created_at : Date.now()
+    await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0, created_at = ? WHERE name = ?").bind(rid, tid, windowStart, s.name).run()
+    await historyAdd(env, s.name, 'h.restored')
+    return json({ ok: true, status: 'pending' })
   }
   // Konteks untuk moderator: status subdomain dan pemiliknya, supaya laporan bisa dinilai dan pemilik bisa diblokir.
   const info = url.pathname.match(/^\/api\/admin\/subdomains\/([a-z0-9-]{1,63})$/)
