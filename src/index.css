@@ -271,3 +271,16 @@ button, input, select, textarea { font-family: inherit; }
 /* Logo asli berwarna navy di latar transparan. Di tema gelap, balik terang dan putar hue agar biru tetap biru. */
 [data-theme="dark"] .logo-art,
 [data-theme="ocean"] .logo-art { filter: invert(1) hue-rotate(180deg); }
+
+/* Kotak pengecek nama: satu kontrol, satu indikator fokus. Input di dalamnya tidak menggambar garis fokus sendiri
+   (itu yang membuat kotak biru kedua); sebagai gantinya seluruh kotak terangkat dan bayangan kerasnya menjadi biru. */
+.namebox { box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s; }
+.namebox:focus-within { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--accent-text); }
+.namebox input:focus-visible { outline: none; }
+.namebox input::placeholder { color: var(--muted); opacity: 1; }
+@media (forced-colors: active) {
+  .namebox:focus-within { outline: 3px solid Highlight; outline-offset: 3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .namebox { transition: none; }
+}
