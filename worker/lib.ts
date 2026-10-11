@@ -40,8 +40,8 @@ const hex = (b: ArrayBuffer | Uint8Array) => [...new Uint8Array(b as ArrayBuffer
 export const randomHex = (bytes = 16) => hex(crypto.getRandomValues(new Uint8Array(bytes)))
 export const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)))
 
-// Iterasi PBKDF2-SHA256. Nilai lama (hash tanpa awalan) dianggap 100000 dan otomatis di-rehash saat login berikutnya.
-export const PBKDF2_ITERATIONS = 600000
+// Iterasi PBKDF2-SHA256. Cloudflare Workers menolak lebih dari 100000 iterasi (NotSupportedError), jadi 100000 adalah batas maksimum.
+export const PBKDF2_ITERATIONS = 100000
 
 export async function hashPassword(pw: string, saltHex: string, iterations = PBKDF2_ITERATIONS) {
   const key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits'])
