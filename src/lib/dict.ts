@@ -219,6 +219,7 @@ export const dict: Record<string, [string, string]> = {
   'h.active': ['Verifikasi berhasil, aktif', 'Verification passed, live'],
   'h.failed': ['Verifikasi gagal', 'Verification failed'],
   'h.needsReview': ['Menunggu tinjauan manual', 'Awaiting manual review'],
+  'h.restored': ['Dipulihkan, menunggu verifikasi', 'Restored, awaiting verification'],
 
   // login
   'login.h.in': ['Masuk ke akunmu', 'Log in to your account'],
