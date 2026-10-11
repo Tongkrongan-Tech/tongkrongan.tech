@@ -55,7 +55,7 @@ export async function runCron(env: Env) {
   }
 
   // 3. Health check subdomain aktif, dan subdomain gagal (down) supaya bisa pulih sendiri.
-  const active = await env.DB.prepare("SELECT name, status, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason IN ('down', 'takeover')) ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string; cf_record_id: string | null; txt_record_id: string | null }>()
+  const active = await env.DB.prepare("SELECT name, status, cf_record_id, txt_record_id FROM subdomains WHERE status = 'active' OR (status = 'failed' AND fail_reason = 'down') ORDER BY RANDOM() LIMIT 50").all<{ name: string; status: string; cf_record_id: string | null; txt_record_id: string | null }>()
   for (const { name, status, cf_record_id, txt_record_id } of active.results) {
     const ok = await healthCheck(env, name)
     await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, ?, ?)').bind(name, ok ? 1 : 0, now).run()
@@ -68,11 +68,14 @@ export async function runCron(env: Env) {
     } else {
       const last = await env.DB.prepare('SELECT ok FROM checks WHERE name = ? ORDER BY id DESC LIMIT 5').bind(name).all<{ ok: number }>()
       if (last.results.length === 5 && last.results.every((x) => !x.ok)) {
+        // Bekukan DNS: hapus record dulu, dan hanya tandai dibekukan bila penghapusan berhasil. Bila gagal, dicoba lagi
+        // di putaran berikutnya (status tetap active) agar tidak ada record yatim yang idnya sudah hilang dari database.
         try {
           if (cf_record_id) await deleteRecord(env, cf_record_id)
           if (txt_record_id) await deleteRecord(env, txt_record_id)
         } catch (err) {
-          console.error('failed deleting dns on takeover', name, err)
+          console.error('gagal membekukan dns saat takeover', name, err)
+          continue
         }
         await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = 'takeover', cf_record_id = NULL, txt_record_id = NULL WHERE name = ?").bind(name).run()
         await hist(env, name, 'h.failed', 'takeover')
