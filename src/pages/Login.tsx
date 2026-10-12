@@ -57,8 +57,15 @@ export function Login() {
   const [info, setInfo] = useState(qs.get('reset') ? t('reset.done') : qs.get('verified') ? t(`login.verified.${qs.get('verified') === '1' ? 1 : 0}`) : qs.get('error') ? t('login.oauthErr') : '')
   const [busy, setBusy] = useState(false)
   const [capKey, setCapKey] = useState(0)
+  const [wait, setWait] = useState(0)
   const onToken = useCallback((x: string) => setCaptcha(x), [])
   useEffect(() => { document.title = `${t('nav.login')} | Tongkrongan.tech` }, [t])
+  useEffect(() => { if (mode === 'otp') setWait(60) }, [mode])
+  useEffect(() => {
+    if (wait <= 0) return
+    const id = setTimeout(() => setWait((w) => w - 1), 1000)
+    return () => clearTimeout(id)
+  }, [wait])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -87,7 +94,7 @@ export function Login() {
 
   async function resend() {
     setErr({}); setInfo('')
-    try { await api('/auth/resend-otp', { body: { email } }); setInfo(t('login.otp.resent')) } catch (ex) { setErr({ form: te(ex) }) }
+    try { await api('/auth/resend-otp', { body: { email } }); setInfo(t('login.otp.resent')); setWait(60) } catch (ex) { setErr({ form: te(ex) }); if (ex instanceof ApiError && ex.status === 429) setWait(60) }
   }
 
   const oauth = config?.oauth
@@ -142,7 +149,7 @@ export function Login() {
               <div>
                 <label htmlFor="otp" className="label">{t('login.otp.label')}</label>
                 <input id="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="field mono text-center text-2xl tracking-[0.5em]" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-                <button type="button" className={`mt-2 ${link}`} style={{ color: 'var(--accent-text)' }} onClick={() => void resend()}>{t('login.otp.resend')}</button>
+                <button type="button" className={`mt-2 ${link}`} style={{ color: 'var(--accent-text)' }} disabled={wait > 0} onClick={() => void resend()}>{wait > 0 ? t('login.otp.wait', { s: wait }) : t('login.otp.resend')}</button>
               </div>
             )}
             {mode !== 'otp' && config?.turnstileSiteKey && <Turnstile key={capKey} siteKey={config.turnstileSiteKey} onToken={onToken} />}

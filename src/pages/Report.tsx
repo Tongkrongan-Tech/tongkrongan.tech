@@ -58,6 +58,7 @@ export function Report() {
         <h1 className="text-[clamp(2.2rem,5vw,3.6rem)]"><Words text={t('report.h1')} /></h1>
         <p className="lead mt-4">{t('report.sub')}</p>
         <p className="mt-6 text-sm font-extrabold"><Mark delay={0.5}>{t('report.target')}</Mark></p>
+        <p className="mt-4 text-sm" style={{ color: 'var(--muted)' }}>{t('report.contact')} <a href={`mailto:halo@${domain}`} className="font-bold underline">halo@{domain}</a></p>
       </div>
       <form onSubmit={submit} noValidate className="grid gap-5">
         <div>
