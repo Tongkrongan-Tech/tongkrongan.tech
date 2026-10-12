@@ -38,7 +38,7 @@ node scripts/contrast.mjs        # kontras WCAG AA semua tema
 | Ikon | SVG digambar sendiri di `components/ui.tsx` | Hindari tampilan pustaka ikon bawaan. Tanpa emoji. |
 | Testimoni | **Sengaja tidak dibuat** | PRD menyebutnya, tetapi belum ada testimoni nyata; antislop R-18 melarang yang fiktif. |
 | Statistik | Tanpa angka karangan. Angka di "Aturan main" (3, 24 jam, TXT, 0 iklan) berasal dari PRD | R-17. |
-| Logo | Logo asli pemilik di `public/logo.png` (latar transparan, navy). Turunannya: `logo-wordmark.png` (tulisan Tongkrongan.tech, navbar), `logo-full.png` (footer), `logo-mark.png` (lambang), `favicon.png`. Ditampilkan **transparan tanpa kotak** (permintaan pemilik); di tema `dark` dan `ocean` kelas `.logo-art` membalik warna dengan `filter: invert(1) hue-rotate(180deg)` agar navy tetap terbaca dan biru tetap biru | Dibuat dari logo.png dengan crop + resize (Pillow). Jangan mengubah logo asli; bila logo diganti, buat ulang ketiga turunan. |
+| Logo | Logo asli pemilik di `docs/assets/logo.png` (di luar `public/` agar tidak ikut terkirim ke `dist`; latar transparan, navy). Turunannya: `logo-wordmark.png` (tulisan Tongkrongan.tech, navbar), `logo-full.png` (footer), `logo-mark.png` (lambang), `favicon.png`. Ditampilkan **transparan tanpa kotak** (permintaan pemilik); di tema `dark` dan `ocean` kelas `.logo-art` membalik warna dengan `filter: invert(1) hue-rotate(180deg)` agar navy tetap terbaca dan biru tetap biru | Dibuat dari logo.png dengan crop + resize (Pillow). Jangan mengubah logo asli; bila logo diganti, buat ulang ketiga turunan. |
 
 ## Struktur
 
@@ -122,7 +122,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Logo pemilik biru/navy: palet `light` dan `dark` diubah ke biru; palet oranye lama jadi tema `kopi`.
 
 ### 2026-10-05, pemasangan logo (agent: Claude Sonnet 5.5)
-- Membuat folder `public/`; pemilik menaruh `logo.png` (1254x1254, RGBA).
+- Membuat folder `public/`; pemilik menaruh `logo.png` (1254x1254, RGBA; kini di `docs/assets/`).
 - Membuat `logo-wordmark.png`, `logo-full.png`, `logo-mark.png`, `favicon.png`; navbar menonjolkan tulisan Tongkrongan.tech, footer memakai logo penuh, keduanya tanpa kotak (transparan); favicon diganti dari data-URI ke `/favicon.png`.
 - Tema gelap memakai filter CSS `.logo-art` (lihat tabel keputusan).
 
