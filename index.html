@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>tongkrongan.tech | Subdomain gratis untuk project kamu</title>
-    <meta name="description" content="Subdomain gratis nama.tongkrongan.tech untuk pelajar, kreator, UMKM, dan developer. Aktif dalam hitungan menit, tanpa kartu kredit." />
+    <title>Tongkrongan.tech | Alamat web gratis yang pantas diingat</title>
+    <meta name="description" content="Dapatkan nama.tongkrongan.tech gratis untuk website kamu. Pilih nama, arahkan ke Vercel, Cloudflare, VPS, atau hosting lain, online dalam hitungan menit." />
     <meta name="robots" content="index, follow, max-image-preview:large" />
-    <meta name="theme-color" content="#1565f0" />
+    <meta name="theme-color" content="#f4f7fd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0e18" media="(prefers-color-scheme: dark)" />
     <link rel="canonical" href="https://tongkrongan.tech/" />
     <link rel="icon" type="image/png" href="/favicon.png" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tongkrongan.tech" />
     <meta property="og:url" content="https://tongkrongan.tech/" />
-    <meta property="og:title" content="tongkrongan.tech | Subdomain gratis untuk project kamu" />
-    <meta property="og:description" content="Pilih nama, isi tujuan, aktif dalam hitungan menit. Sambungkan ke Cloudflare, Railway, Vercel, GitHub Pages, VPS, atau hosting biasa." />
+    <meta property="og:title" content="Tongkrongan.tech | Alamat web gratis yang pantas diingat" />
+    <meta property="og:description" content="Pilih nama, arahkan ke tempat websitemu berada, online dalam hitungan menit. Gratis, tanpa kartu kredit, tanpa perlu paham DNS." />
     <meta property="og:image" content="https://tongkrongan.tech/og-banner.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
@@ -24,7 +25,7 @@
     <meta property="og:locale:alternate" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="tongkrongan.tech | Subdomain gratis untuk project kamu" />
+    <meta name="twitter:title" content="Tongkrongan.tech | Alamat web gratis yang pantas diingat" />
     <meta name="twitter:description" content="Pilih nama, isi tujuan, aktif dalam hitungan menit. Tanpa kartu kredit." />
     <meta name="twitter:image" content="https://tongkrongan.tech/og-banner.jpg" />
     <meta name="twitter:image:alt" content="tongkrongan.tech: subdomain gratis yourname.tongkrongan.tech" />
@@ -38,7 +39,7 @@
             "@id": "https://tongkrongan.tech/#website",
             "url": "https://tongkrongan.tech/",
             "name": "Tongkrongan.tech",
-            "description": "Subdomain gratis untuk pelajar, kreator, UMKM, dan developer.",
+            "description": "Alamat web gratis untuk pelajar, kreator, UMKM, dan developer.",
             "inLanguage": ["id", "en"],
             "publisher": { "@id": "https://tongkrongan.tech/#org" }
           },
@@ -55,11 +56,13 @@
     <script>
       try {
         var t = localStorage.getItem('tt.theme');
-        if (t) document.documentElement.dataset.theme = t;
+        var ok = ['light', 'dark', 'kopi', 'mint', 'grape', 'ocean'].indexOf(t) > -1;
+        document.documentElement.dataset.theme = ok ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         var l = localStorage.getItem('tt.lang');
         if (l) document.documentElement.lang = l;
       } catch (e) {}
     </script>
+    <style>html[data-theme="light"]{background:#f4f7fd}html[data-theme="dark"]{background:#0a0e18}html[data-theme="kopi"]{background:#f9f1e4}html[data-theme="mint"]{background:#e8f3e3}html[data-theme="grape"]{background:#f0eafb}html[data-theme="ocean"]{background:#061a33}</style>
   </head>
   <body>
     <div id="root"></div>

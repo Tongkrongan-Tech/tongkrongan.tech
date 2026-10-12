@@ -1,143 +1,173 @@
 @import "tailwindcss";
-@import "@fontsource/poppins/latin-300.css";
-@import "@fontsource/poppins/latin-400.css";
-@import "@fontsource/poppins/latin-500.css";
-@import "@fontsource/poppins/latin-600.css";
-@import "@fontsource/poppins/latin-700.css";
-@import "@fontsource/poppins/latin-800.css";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
 
-/* Semua warna lewat token. Tiap tema hanya mengganti token, bukan komponen. */
+/* Semua warna lewat token; tiap tema hanya mengganti token. Palet: tinta, kertas, satu biru merek, satu kuning stabilo (lihat DESIGN.md).
+   Token berwarna hex dicek kontrasnya oleh scripts/contrast.mjs. */
+/* Enam tema pilihan pengguna. Tiap tema: kertas, tinta, satu aksen, dan stabilo kuning sebagai motif. --sh adalah warna bayangan keras tombol dan papan. */
 :root,
 [data-theme="light"] {
-  --inv-bg: #151a26;
-  --inv-ink: #f6f8fc;
-  --inv-accent: #7fb0ff;
-  --bg: #f6f8fc;
+  --bg: #f4f7fd;
   --surface: #ffffff;
-  --surface-2: #e8eef9;
-  --ink: #151a26;
-  --muted: #4d576b;
-  --line: #151a26;
-  --accent: #1565f0;
+  --surface-2: #e5ecf9;
+  --ink: #0c1426;
+  --muted: #44506a;
+  --accent: #1553e0;
   --accent-ink: #ffffff;
-  --accent-text: #0b52d4;
-  --hl: #ffd25e;
-  --hl-ink: #151a26;
-  --ok: #0e7a43;
+  --accent-text: #0e47c8;
+  --hl: #ffe066;
+  --hl-ink: #0c1426;
+  --ok: #0a7a42;
   --warn: #8a5a00;
   --bad: #b3261e;
-  --shadow: 4px 4px 0 var(--line);
-  color-scheme: light;
-}
-[data-theme="kopi"] {
-  --inv-bg: #1b1612;
-  --inv-ink: #fbf6ee;
-  --inv-accent: #ffd25e;
-  --bg: #fbf6ee;
-  --surface: #ffffff;
-  --surface-2: #f3eadb;
-  --ink: #1b1612;
-  --muted: #5e5348;
-  --line: #1b1612;
-  --accent: #ff6b3d;
-  --accent-ink: #1b1612;
-  --accent-text: #b43a10;
-  --hl: #ffd25e;
-  --hl-ink: #1b1612;
-  --ok: #0e7a43;
-  --warn: #8a5a00;
-  --bad: #b3261e;
-  --shadow: 4px 4px 0 var(--line);
+  --inv-bg: #0c1426;
+  --inv-ink: #f4f7fd;
+  --inv-accent: #ffe066;
+  --line: rgba(12, 20, 38, 0.13);
+  --line-2: rgba(12, 20, 38, 0.3);
+  --sh: #0c1426;
+  --board: #121b30;
+  --board-tile: #1c2842;
+  --board-ink: #f4f7fd;
+  --board-dim: #aebbd6;
   color-scheme: light;
 }
 [data-theme="dark"] {
-  --inv-bg: #232a39;
-  --inv-ink: #eef2fa;
-  --inv-accent: #ffd25e;
-  --bg: #0f1219;
-  --surface: #181d28;
-  --surface-2: #232a39;
-  --ink: #eef2fa;
-  --muted: #aab4c8;
-  --line: #eef2fa;
-  --accent: #5b9bff;
-  --accent-ink: #0b1020;
-  --accent-text: #8ab8ff;
-  --hl: #ffd25e;
-  --hl-ink: #0f1219;
+  --bg: #0a0e18;
+  --surface: #121927;
+  --surface-2: #1b2435;
+  --ink: #eaf0fb;
+  --muted: #9fadc9;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --accent-text: #8ab4ff;
+  --hl: #f5d547;
+  --hl-ink: #0a0e18;
   --ok: #5fd68f;
   --warn: #f2b84b;
   --bad: #ff8a80;
-  --shadow: 4px 4px 0 #000;
+  --inv-bg: #eaf0fb;
+  --inv-ink: #0a0e18;
+  --inv-accent: #1d4fd8;
+  --line: rgba(234, 240, 251, 0.14);
+  --line-2: rgba(234, 240, 251, 0.3);
+  --sh: #000000;
+  --board: #05070d;
+  --board-tile: #121927;
+  --board-ink: #eaf0fb;
+  --board-dim: #8b99b6;
   color-scheme: dark;
 }
+[data-theme="kopi"] {
+  --bg: #f9f1e4;
+  --surface: #fffbf3;
+  --surface-2: #efe0c9;
+  --ink: #2a1a10;
+  --muted: #6a5242;
+  --accent: #ff6b3d;
+  --accent-ink: #2a1a10;
+  --accent-text: #a8360c;
+  --hl: #ffd25e;
+  --hl-ink: #2a1a10;
+  --ok: #0e7a43;
+  --warn: #8a5a00;
+  --bad: #b3261e;
+  --inv-bg: #2a1a10;
+  --inv-ink: #f9f1e4;
+  --inv-accent: #ffb27a;
+  --line: rgba(42, 26, 16, 0.14);
+  --line-2: rgba(42, 26, 16, 0.32);
+  --sh: #2a1a10;
+  --board: #3a2517;
+  --board-tile: #4a301f;
+  --board-ink: #f9f1e4;
+  --board-dim: #d2bba3;
+  color-scheme: light;
+}
 [data-theme="mint"] {
-  --inv-bg: #10261a;
-  --inv-ink: #e6f4ea;
-  --inv-accent: #3ddc84;
-  --bg: #e6f4ea;
-  --surface: #ffffff;
-  --surface-2: #cfe9d8;
+  --bg: #e8f3e3;
+  --surface: #fbfff8;
+  --surface-2: #d3e6cc;
   --ink: #10261a;
-  --muted: #3a5645;
-  --line: #10261a;
-  --accent: #3ddc84;
+  --muted: #3c5846;
+  --accent: #34c47a;
   --accent-ink: #10261a;
-  --accent-text: #0b6638;
+  --accent-text: #0a6537;
   --hl: #ffe066;
   --hl-ink: #10261a;
-  --ok: #0b6638;
+  --ok: #0a6537;
   --warn: #7a5200;
   --bad: #a8261e;
-  --shadow: 4px 4px 0 var(--line);
+  --inv-bg: #10261a;
+  --inv-ink: #e8f3e3;
+  --inv-accent: #6ee7a0;
+  --line: rgba(16, 38, 26, 0.14);
+  --line-2: rgba(16, 38, 26, 0.32);
+  --sh: #10261a;
+  --board: #15331f;
+  --board-tile: #1f4a2d;
+  --board-ink: #e8f3e3;
+  --board-dim: #a8cdb4;
   color-scheme: light;
 }
 [data-theme="grape"] {
-  --inv-bg: #1e1433;
-  --inv-ink: #efe9fb;
-  --inv-accent: #b79cff;
-  --bg: #efe9fb;
-  --surface: #ffffff;
-  --surface-2: #ddd1f6;
-  --ink: #1e1433;
-  --muted: #4a3f6b;
-  --line: #1e1433;
-  --accent: #b79cff;
-  --accent-ink: #1e1433;
-  --accent-text: #5a2dcf;
+  --bg: #f0eafb;
+  --surface: #fdfbff;
+  --surface-2: #ddd2f4;
+  --ink: #1f1340;
+  --muted: #4d4377;
+  --accent: #a98bff;
+  --accent-ink: #1f1340;
+  --accent-text: #5527c9;
   --hl: #ffd25e;
-  --hl-ink: #1e1433;
+  --hl-ink: #1f1340;
   --ok: #0e7a43;
   --warn: #7a5200;
   --bad: #a8261e;
-  --shadow: 4px 4px 0 var(--line);
+  --inv-bg: #1f1340;
+  --inv-ink: #f0eafb;
+  --inv-accent: #c4b0ff;
+  --line: rgba(31, 19, 64, 0.14);
+  --line-2: rgba(31, 19, 64, 0.32);
+  --sh: #1f1340;
+  --board: #2a1a58;
+  --board-tile: #38256e;
+  --board-ink: #f0eafb;
+  --board-dim: #bfb1e6;
   color-scheme: light;
 }
 [data-theme="ocean"] {
-  --inv-bg: #04142b;
-  --inv-ink: #eaf2ff;
-  --inv-accent: #5ce1e6;
-  --bg: #0b2545;
-  --surface: #13315c;
-  --surface-2: #1b4177;
-  --ink: #eaf2ff;
-  --muted: #a9bfdd;
-  --line: #eaf2ff;
-  --accent: #5ce1e6;
-  --accent-ink: #0b2545;
+  --bg: #061a33;
+  --surface: #0c2747;
+  --surface-2: #133661;
+  --ink: #e8f1ff;
+  --muted: #a3b9d8;
+  --accent: #4fd8dd;
+  --accent-ink: #061a33;
   --accent-text: #5ce1e6;
   --hl: #ffd25e;
-  --hl-ink: #0b2545;
+  --hl-ink: #061a33;
   --ok: #6ee7a0;
   --warn: #f2b84b;
   --bad: #ff9c94;
-  --shadow: 4px 4px 0 #04142b;
+  --inv-bg: #e8f1ff;
+  --inv-ink: #061a33;
+  --inv-accent: #0a5f8a;
+  --line: rgba(232, 241, 255, 0.15);
+  --line-2: rgba(232, 241, 255, 0.32);
+  --sh: #020c1a;
+  --board: #030f20;
+  --board-tile: #0c2747;
+  --board-ink: #e8f1ff;
+  --board-dim: #8aa3c6;
   color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface2: var(--surface-2);
@@ -149,138 +179,143 @@
   --color-accent-text: var(--accent-text);
   --color-hl: var(--hl);
   --color-hl-ink: var(--hl-ink);
-  --color-inv-bg: var(--inv-bg);
-  --color-inv-ink: var(--inv-ink);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
-  line-height: 1.6;
-  overflow-x: hidden;
-  transition: background-color 0.3s, color 0.3s;
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-sans); line-height: 1.6; overflow-x: clip;
+  -webkit-font-smoothing: antialiased; transition: background-color 0.3s, color 0.3s;
 }
 button, input, select, textarea { font-family: inherit; }
 ::selection { background: var(--hl); color: var(--hl-ink); }
+h1, h2, h3 { letter-spacing: -0.035em; text-wrap: balance; font-weight: 800; line-height: 1.04; }
+p { text-wrap: pretty; }
+code, .mono { font-family: var(--font-mono); }
+:focus-visible { outline: 3px solid var(--accent-text); outline-offset: 3px; border-radius: 4px; }
 
-/* Fokus keyboard selalu terlihat */
-:focus-visible {
-  outline: 3px solid var(--accent-text);
-  outline-offset: 3px;
-  border-radius: 6px;
-}
-[data-theme="ocean"] :focus-visible,
-[data-theme="dark"] :focus-visible { outline-color: var(--hl); }
+.h-section { font-size: clamp(2rem, 4.6vw, 3.4rem); }
+.lead { color: var(--muted); font-size: clamp(1rem, 1.5vw, 1.15rem); line-height: 1.65; }
 
-/* Komponen dasar */
-.card {
-  background: var(--surface);
-  border: 2px solid var(--line);
-  border-radius: 18px;
-}
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  min-height: 48px; padding: 0 1.4rem;
-  font-weight: 600; font-size: 0.95rem;
-  border: 2px solid var(--line); border-radius: 12px;
-  background: var(--surface); color: var(--ink);
-  cursor: pointer; text-decoration: none;
-  transition: transform 0.15s, box-shadow 0.15s, background-color 0.2s;
-  box-shadow: 3px 3px 0 var(--line);
-}
-.btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--line); }
-.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--line); }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: 3px 3px 0 var(--line); }
-.btn-primary { background: var(--accent); color: var(--accent-ink); }
-.btn-ghost { box-shadow: none; background: transparent; }
-.btn-ghost:hover { box-shadow: none; transform: none; background: var(--surface-2); }
-.btn-danger { background: var(--bad); color: #fff; }
-[data-theme="dark"] .btn-danger, [data-theme="ocean"] .btn-danger { color: #14110f; }
+@layer components {
+  .card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    min-height: 44px; padding: 0 1.2rem; font-weight: 700; font-size: 0.92rem; line-height: 1; white-space: nowrap;
+    border: 1.5px solid var(--ink); border-radius: 8px; background: var(--surface); color: var(--ink);
+    cursor: pointer; text-decoration: none; box-shadow: 3px 3px 0 var(--sh);
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--sh); }
+  .btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--sh); }
+  .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: 3px 3px 0 var(--line-2); border-color: var(--line-2); }
+  .btn-sm { min-height: 36px; padding: 0 0.85rem; font-size: 0.84rem; border-radius: 6px; box-shadow: 2px 2px 0 var(--sh); }
+  .btn-lg { min-height: 54px; padding: 0 1.6rem; font-size: 1rem; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-ghost { background: transparent; border-color: transparent; box-shadow: none; }
+  .btn-ghost:hover { background: var(--surface-2); box-shadow: none; transform: none; }
+  .btn-ghost:active { transform: none; }
+  .btn-outline { box-shadow: none; border-color: var(--line-2); }
+  .btn-outline:hover { box-shadow: none; transform: none; border-color: var(--ink); background: var(--surface-2); }
+  .btn-danger { background: var(--bad); color: #fff; border-color: var(--ink); }
+  [data-theme="dark"] .btn-danger, [data-theme="ocean"] .btn-danger { color: #1a0a09; }
+  .btn-danger-ghost { color: var(--bad); background: transparent; box-shadow: none; border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+  .btn-danger-ghost:hover { background: color-mix(in srgb, var(--bad) 10%, transparent); box-shadow: none; transform: none; border-color: var(--bad); }
 
-.field {
-  width: 100%; min-height: 48px; padding: 0 1rem;
-  background: var(--surface); color: var(--ink);
-  border: 2px solid var(--line); border-radius: 12px; font-size: 1rem;
-}
-.field::placeholder { color: var(--muted); opacity: 1; }
-.label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
-.hint { color: var(--muted); font-size: 0.85rem; }
+  .field {
+    width: 100%; min-height: 46px; padding: 0 0.95rem; background: var(--surface); color: var(--ink);
+    border: 1.5px solid var(--line-2); border-radius: 8px; font-size: 0.98rem; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  textarea.field { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .field:hover { border-color: var(--ink); }
+  .field:focus { outline: none; border-color: var(--accent-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-text) 30%, transparent); }
+  .field[aria-invalid="true"] { border-color: var(--bad); }
+  .field::placeholder { color: var(--muted); opacity: 0.8; }
+  .label { display: block; font-weight: 700; font-size: 0.88rem; margin-bottom: 0.4rem; }
+  .hint { color: var(--muted); font-size: 0.85rem; }
 
-/* Penanda stabilo: motif identitas (nama di alamat web) */
-.mark {
-  background: linear-gradient(transparent 12%, var(--hl) 12%, var(--hl) 92%, transparent 92%);
-  color: var(--hl-ink);
-  padding: 0 0.15em;
-  border-radius: 4px;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  /* Stabilo kuning: motif identitas, hanya untuk nama yang dipilih pengguna */
+  .mark {
+    background: linear-gradient(transparent 8%, var(--hl) 8%, var(--hl) 94%, transparent 94%);
+    color: var(--hl-ink); padding: 0 0.2em; border-radius: 3px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  }
+  /* Penanda status nyata (Aktif, Menunggu, Gagal), bukan hiasan */
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 700; line-height: 1;
+    padding: 0.35rem 0.6rem; border-radius: 4px; border: 1.5px solid currentColor;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    padding: 0.4rem 0.75rem; border-radius: 6px; border: 1.5px solid var(--line-2); background: var(--surface); color: var(--ink);
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .chip:hover { border-color: var(--ink); background: var(--surface-2); }
+  .kbd {
+    display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 0.35rem;
+    font: 600 0.75rem var(--font-mono); color: var(--muted); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; background: var(--surface);
+  }
 }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.badge {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  font-size: 0.8rem; font-weight: 600;
-  padding: 0.2rem 0.7rem; border-radius: 8px;
-  border: 2px solid currentColor;
+/* Papan nama: alamat tampil di papan, huruf berbalik satu per satu seperti papan jadwal terminal. */
+.plate {
+  position: relative; background: var(--board); color: var(--board-ink); border-radius: 4px;
+  border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--sh);
 }
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+.plate .screw { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--board-dim); opacity: 0.55; box-shadow: inset -1px -1px 0 rgba(0, 0, 0, 0.5); }
+.tile {
+  display: inline-grid; place-items: center; min-width: 1ch; padding: 0.08em 0.14em; margin: 0 0.04em;
+  background: var(--board-tile); border-radius: 3px; position: relative; backface-visibility: hidden;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
-
-.marquee { display: flex; width: max-content; animation: marquee 32s linear infinite; }
-.marquee:hover { animation-play-state: paused; }
-@keyframes marquee { to { transform: translateX(-50%); } }
-
-@keyframes blink { 50% { opacity: 0; } }
-.caret { display: inline-block; width: 3px; height: 1em; background: currentColor; margin-left: 2px; vertical-align: -0.12em; animation: blink 1s steps(1) infinite; }
+.tile::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0, 0, 0, 0.55); }
+@keyframes flip-in { 0% { transform: rotateX(-90deg); } 60% { transform: rotateX(18deg); } 100% { transform: rotateX(0); } }
+.tile-new { animation: flip-in 0.34s cubic-bezier(0.3, 1.3, 0.5, 1) both; transform-origin: 50% 50%; }
+@keyframes stamp { 0% { transform: scale(1.8) rotate(-12deg); opacity: 0; } 60% { transform: scale(0.94) rotate(-6deg); opacity: 1; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
+.stamp { animation: stamp 0.4s cubic-bezier(0.2, 1, 0.4, 1) both; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.9s linear infinite; }
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 currentColor; } 100% { box-shadow: 0 0 0 10px transparent; } }
-.pulse { animation: pulse-ring 1.4s ease-out infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.caret { display: inline-block; width: 2px; height: 1.05em; background: var(--accent-text); margin-left: 2px; vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
+@keyframes pulse-dot { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.pulse { animation: pulse-dot 1.6s ease-out infinite; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.skeleton {
-  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
-  background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
-  border-radius: 10px;
-}
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-  .marquee { animation: none; flex-wrap: wrap; width: auto; }
-}
+/* Sinar yang melaju di jalur DNS: memperlihatkan arah permintaan pengunjung */
+.beam { position: relative; overflow: hidden; background: var(--line-2); }
+.beam-h { height: 2px; width: 100%; }
+.beam-v { width: 2px; height: 100%; min-height: 2.5rem; }
+.beam::after { content: ""; position: absolute; background: var(--accent-text); }
+.beam-h::after { top: 0; left: 0; height: 100%; width: 28%; animation: beam-x 1.6s linear infinite; }
+.beam-v::after { left: 0; top: 0; width: 100%; height: 35%; animation: beam-y 1.5s linear infinite; }
+@keyframes beam-x { from { transform: translateX(-100%); } to { transform: translateX(380%); } }
+@keyframes beam-y { from { transform: translateY(-100%); } to { transform: translateY(300%); } }
 
-@media (prefers-reduced-motion: reduce) {
-  .marquee-dup { display: none; }
-}
-
-@keyframes flow { to { stroke-dashoffset: -24; } }
-.flow { animation: flow 1.2s linear infinite; }
-
-/* Logo asli berwarna navy di latar transparan. Di tema gelap, balik terang dan putar hue agar biru tetap biru. */
+/* Logo berwarna gelap di latar transparan. Di tema gelap dibalik terang, hue diputar agar biru tetap biru. */
 [data-theme="dark"] .logo-art,
 [data-theme="ocean"] .logo-art { filter: invert(1) hue-rotate(180deg); }
 
-/* Kotak pengecek nama: satu kontrol, satu indikator fokus. Input di dalamnya tidak menggambar garis fokus sendiri
-   (itu yang membuat kotak biru kedua); sebagai gantinya seluruh kotak terangkat dan bayangan kerasnya menjadi biru. */
-.namebox { box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s; }
-.namebox:focus-within { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--accent-text); }
-.namebox input:focus-visible { outline: none; }
-.namebox input::placeholder { color: var(--muted); opacity: 1; }
-@media (forced-colors: active) {
-  .namebox:focus-within { outline: 3px solid Highlight; outline-offset: 3px; }
-}
+/* Transisi tema: lingkaran membuka dari titik klik */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+
+.namebar { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--sh); transition: box-shadow 0.15s, transform 0.15s; }
+.namebar:focus-within { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--accent-text); }
+.namebar input:focus-visible { outline: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  .namebox { transition: none; }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+@media (forced-colors: active) {
+  .namebar:focus-within { outline: 3px solid Highlight; outline-offset: 3px; }
 }

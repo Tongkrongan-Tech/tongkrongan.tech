@@ -9,6 +9,8 @@ import { PLATFORMS, platformById, validateValue, type PlatformId, type RecordTyp
 import { checkName } from '../lib/names'
 import { NameChecker, useNameCheck } from '../components/NameChecker'
 import { DnsDiagram } from '../components/DnsDiagram'
+import { Plate } from '../components/Plate'
+import { Burst } from '../components/fx'
 import { Icon, Spinner, StatusBadge } from '../components/ui'
 
 const STEPS = ['name', 'platform', 'record', 'verify'] as const
@@ -136,215 +138,230 @@ export function Claim() {
   const canNext = step === 0 ? nameOk && !quotaFull && checkName(clean).kind === 'ok' : true
   const failKey = cur?.failReason ? `val.${cur.failReason}` : ''
   const vars = { host, p: p.name }
+  const shownType = step === 3 ? cur?.type ?? type : type
+  const shownValue = step === 3 ? cur?.value ?? value : value
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">{t('claim.h1')}</h1>
+    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+      <h1 className="text-[clamp(2rem,5vw,3.4rem)]">{t('claim.h1')}</h1>
+      <p className="lead mt-3">{t('claim.sub')}</p>
 
       <ol className="mt-8 grid grid-cols-4 gap-2" aria-label={t('claim.progress')}>
         {STEPS.map((s, i) => (
           <li key={s} aria-current={i === step ? 'step' : undefined}>
-            <div className="h-2.5 overflow-hidden rounded-full border-2" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-              <motion.div className="h-full" style={{ background: 'var(--accent)' }} animate={{ width: i <= step ? '100%' : '0%' }} transition={{ duration: 0.4 }} />
-            </div>
-            <span className="mt-1.5 hidden text-xs font-semibold sm:block" style={{ color: i === step ? 'var(--ink)' : 'var(--muted)' }}>{i + 1}. {t(`claim.step.${s}`)}</span>
+            <div className="h-[5px]" style={{ background: i <= step ? 'var(--ink)' : 'var(--line-2)', transition: 'background .3s' }} />
+            <span className="mt-2 hidden text-sm font-extrabold sm:block" style={{ color: i === step ? 'var(--ink)' : 'var(--muted)' }}>{i + 1}. {t(`claim.step.${s}`)}</span>
           </li>
         ))}
       </ol>
-      <p className="mt-2 text-sm font-semibold sm:hidden" style={{ color: 'var(--muted)' }}>{t('claim.stepOf', { n: step + 1, total: 4 })}: {t(`claim.step.${STEPS[step]}`)}</p>
+      <p className="mt-2 text-sm font-bold sm:hidden" style={{ color: 'var(--muted)' }}>{t('claim.stepOf', { n: step + 1, total: 4 })}: {t(`claim.step.${STEPS[step]}`)}</p>
 
-      <AnimatePresence mode="wait">
-        <motion.div key={step} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.25 }} className="mt-8">
-          {step === 0 && (
-            <div className="max-w-2xl">
-              <h2 className="mb-5 text-2xl font-bold">{t('claim.s0.h')}</h2>
-              <NameChecker value={name} onChange={setName} cta={false} />
-              {quotaFull && <p role="alert" className="card mt-4 p-4 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{t('claim.quota', { n: quota })} <Link to="/dashboard" style={{ color: 'var(--ink)' }}>{t('nav.dashboard')}</Link></p>}
-              {ready && !user && nameOk && <p className="hint mt-2">{t('claim.needLogin')}</p>}
-            </div>
-          )}
+      <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_24rem]">
+        <div className="min-w-0">
+          <AnimatePresence mode="wait">
+            <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}>
+              {step === 0 && (
+                <div className="max-w-2xl">
+                  <h2 className="mb-5 text-2xl">{t('claim.s0.h')}</h2>
+                  <NameChecker value={name} onChange={setName} cta={false} showLabel />
+                  {quotaFull && <p role="alert" className="mt-4 rounded-lg border-2 p-4 text-sm font-bold" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t('claim.quota', { n: quota })} <Link to="/dashboard" style={{ color: 'var(--ink)' }}>{t('nav.dashboard')}</Link></p>}
+                  {ready && !user && nameOk && <p className="hint mt-2">{t('claim.needLogin')}</p>}
+                </div>
+              )}
 
-          {step === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold">{t('claim.s1.h')}</h2>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={t('claim.s1.h')}>
-                {PLATFORMS.map((x, k) => (
-                  <motion.button key={x.id} type="button" role="radio" aria-checked={platform === x.id} onClick={() => { if (x.id !== platform) { setTxtValue(''); setTxtLabel(null) } setPlatform(x.id); setType(x.defaultType); setValues({}) }} whileHover={{ y: -5 }} whileTap={{ scale: 0.96 }} className="min-h-[130px] cursor-pointer border-2 p-4 text-left" style={{ borderColor: 'var(--line)', background: x.color, color: '#1b1612', borderRadius: k % 2 ? 14 : 26, boxShadow: platform === x.id ? '5px 5px 0 var(--line)' : 'none', outline: platform === x.id ? '3px solid var(--line)' : undefined, outlineOffset: 2 }}>
-                    <span className="block text-xl font-extrabold">{x.name}</span>
-                    <span className="mt-1 block text-xs font-medium">{t(`plat.${x.id}.tag`)}</span>
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          )}
+              {step === 1 && (
+                <div>
+                  <h2 className="text-2xl">{t('claim.s1.h')}</h2>
+                  <div className="mt-6 border-t-[1.5px]" style={{ borderColor: 'var(--ink)' }} role="radiogroup" aria-label={t('claim.s1.h')}>
+                    {PLATFORMS.map((x) => {
+                      const on = platform === x.id
+                      return (
+                        <button key={x.id} type="button" role="radio" aria-checked={on} onClick={() => { if (x.id !== platform) { setTxtValue(''); setTxtLabel(null) } setPlatform(x.id); setType(x.defaultType); setValues({}) }}
+                          className="flex w-full cursor-pointer items-center justify-between gap-4 border-0 border-b px-3 py-4 text-left" style={{ borderColor: 'var(--line-2)', background: on ? 'var(--hl)' : 'transparent', color: on ? 'var(--hl-ink)' : 'var(--ink)' }}>
+                          <span>
+                            <span className="block text-lg font-extrabold tracking-tight">{x.name}</span>
+                            <span className="block text-sm" style={{ color: on ? 'var(--hl-ink)' : 'var(--muted)' }}>{t(`plat.${x.id}.tag`)}</span>
+                          </span>
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[4px] border-2" style={{ borderColor: on ? 'var(--ink)' : 'var(--line-2)', background: on ? 'var(--ink)' : 'transparent', color: 'var(--hl)' }}>{on && <Icon.check size={14} strokeWidth={3.4} />}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
-          {step === 2 && (
-            <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-              <div>
-                <h2 className="text-2xl font-bold">{t('claim.s2.h', { p: p.name })}</h2>
-                {vAuto && !mine && (
-                  <div className="mt-5 rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-                    <p className="text-sm font-bold">{t('claim.vauto.h')}</p>
-                    <p className="hint mt-1">{t('claim.vauto.hint')}</p>
-                    {vConn === 'yes' ? (
-                      <div className="mt-3 grid gap-3">
-                        <label htmlFor="vproj" className="label">{t('claim.vauto.project')}</label>
-                        {vProjects.length ? (
-                          <select id="vproj" className="field" value={vProject} onChange={(e) => setVProject(e.target.value)}>
-                            {vProjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                          </select>
-                        ) : <p className="hint">{t('claim.vauto.none')}</p>}
-                        <button type="button" className="btn btn-primary" disabled={busy || !vProject} onClick={() => void autoVercel()}>{busy ? <Spinner /> : t('claim.vauto.go', { host })}</button>
+              {step === 2 && (
+                <div>
+                  <h2 className="text-2xl">{t('claim.s2.h', { p: p.name })}</h2>
+                  {vAuto && !mine && (
+                    <div className="mt-5 rounded-lg border-2 p-4" style={{ borderColor: 'var(--ink)', background: 'var(--surface)' }}>
+                      <p className="text-sm font-extrabold">{t('claim.vauto.h')}</p>
+                      <p className="hint mt-1">{t('claim.vauto.hint')}</p>
+                      {vConn === 'yes' ? (
+                        <div className="mt-3 grid gap-3">
+                          <label htmlFor="vproj" className="label">{t('claim.vauto.project')}</label>
+                          {vProjects.length ? (
+                            <select id="vproj" className="field" value={vProject} onChange={(e) => setVProject(e.target.value)}>
+                              {vProjects.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                            </select>
+                          ) : <p className="hint">{t('claim.vauto.none')}</p>}
+                          <button type="button" className="btn btn-primary" disabled={busy || !vProject} onClick={() => void autoVercel()}>{busy ? <Spinner /> : t('claim.vauto.go', { host })}</button>
+                        </div>
+                      ) : (
+                        <button type="button" className="btn btn-primary mt-3" disabled={vConn === 'unknown'} onClick={openVercel}>{t('claim.vauto.connect')}</button>
+                      )}
+                      <p role="alert" className="mt-2 min-h-5 text-sm font-bold" style={{ color: 'var(--bad)' }}>{error}</p>
+                      <p className="hint mt-1">{t('claim.vauto.or')}</p>
+                    </div>
+                  )}
+                  <div className="mt-5 grid gap-6">
+                    <div>
+                      <span id="rtype-l" className="label">{t('claim.type')}</span>
+                      <div role="radiogroup" aria-labelledby="rtype-l" className="flex flex-wrap gap-2" onFocus={() => setFocus('type')}>
+                        {p.types.map((ty) => (
+                          <button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)} className="btn btn-sm mono" style={{ background: type === ty ? 'var(--hl)' : 'var(--surface)', color: type === ty ? 'var(--hl-ink)' : 'var(--ink)' }}>{ty}</button>
+                        ))}
                       </div>
-                    ) : (
-                      <button type="button" className="btn btn-primary mt-3" disabled={vConn === 'unknown'} onClick={openVercel}>{t('claim.vauto.connect')}</button>
+                      <p className="hint mt-2">{t(`type.${type}`)}</p>
+                    </div>
+                    <div>
+                      <label htmlFor="rvalue" className="label">{t('claim.value')}</label>
+                      <input id="rvalue" className="field mono" value={value} onChange={(e) => setValue(e.target.value)} onFocus={() => setFocus('value')} onBlur={() => { setTouched(true); setFocus(null) }} placeholder={p.placeholder[type] ?? ''} autoComplete="off" spellCheck={false} aria-invalid={touched && !!valErr} aria-describedby="rvalue-msg" />
+                      <div id="rvalue-msg" aria-live="polite" className="mt-2 min-h-6 text-sm font-semibold">
+                        {touched && valErr ? <p style={{ color: 'var(--bad)' }}>{t(`val.${valErr}`)}</p> : !valErr ? <p style={{ color: 'var(--ok)' }} className="inline-flex items-center gap-1"><Icon.check size={14} /> {t('val.ok')}</p> : null}
+                      </div>
+                      {p.placeholder[type] && <button type="button" className="mt-1 cursor-pointer border-0 bg-transparent p-0 py-2 text-sm font-bold underline" style={{ color: 'var(--accent-text)' }} onClick={() => setValue(p.placeholder[type]!)}>{t('claim.useExample')}</button>}
+                    </div>
+                    {platform === 'vercel' && (
+                      <details open={!!txtValue} className="rounded-lg border p-4" style={{ borderColor: 'var(--line-2)' }}>
+                        <summary className="cursor-pointer text-sm font-extrabold">{t('claim.vtxt.h')}</summary>
+                        <p className="hint mt-2">{t('claim.vtxt.hint', { domain })}</p>
+                        <label htmlFor="vtx" className="label mt-3">{t('claim.txt.value')}</label>
+                        <input id="vtx" className="field mono" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={`vc-domain-verify=${clean || 'nama'}.${domain},xxxxxxxx`} autoComplete="off" spellCheck={false} aria-invalid={touched && txtErr} />
+                        <p aria-live="polite" className="mt-1 min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{touched && txtErr ? t('claim.vtxt.err', { domain }) : ''}</p>
+                      </details>
                     )}
-                    <p role="alert" className="mt-2 min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{error}</p>
-                    <p className="hint mt-1">{t('claim.vauto.or')}</p>
-                  </div>
-                )}
-                <div className="mt-5 grid gap-5">
-                  <div>
-                    <label htmlFor="rtype" className="label">{t('claim.type')}</label>
-                    <div id="rtype" role="radiogroup" aria-label={t('claim.type')} className="flex flex-wrap gap-2" onFocus={() => setFocus('type')}>
-                      {p.types.map((ty) => (
-                        <button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)} className="btn !min-h-11" style={{ background: type === ty ? 'var(--accent)' : 'var(--surface)', color: type === ty ? 'var(--accent-ink)' : 'var(--ink)' }}>{ty}</button>
-                      ))}
-                    </div>
-                    <p className="hint mt-2">{t(`type.${type}`)}</p>
-                  </div>
-                  <div>
-                    <label htmlFor="rvalue" className="label">{t('claim.value')}</label>
-                    <input id="rvalue" className="field" value={value} onChange={(e) => setValue(e.target.value)} onFocus={() => setFocus('value')} onBlur={() => { setTouched(true); setFocus(null) }} placeholder={p.placeholder[type] ?? ''} autoComplete="off" spellCheck={false} aria-invalid={touched && !!valErr} aria-describedby="rvalue-msg" />
-                    <div id="rvalue-msg" aria-live="polite" className="mt-2 min-h-6 text-sm font-medium">
-                      {touched && valErr ? (
-                        <p style={{ color: 'var(--bad)' }}>{t(`val.${valErr}`)}</p>
-                      ) : !valErr ? (
-                        <p style={{ color: 'var(--ok)' }} className="inline-flex items-center gap-1"><Icon.check size={14} /> {t('val.ok')}</p>
-                      ) : null}
-                    </div>
-                    {p.placeholder[type] && <button type="button" className="mt-1 cursor-pointer border-0 bg-transparent p-0 py-2 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }} onClick={() => setValue(p.placeholder[type]!)}>{t('claim.useExample')}</button>}
-                  </div>
-                  {platform === 'vercel' && (
-                    <details open={!!txtValue} className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)' }}>
-                      <summary className="cursor-pointer text-sm font-bold">{t('claim.vtxt.h')}</summary>
-                      <p className="hint mt-2">{t('claim.vtxt.hint', { domain })}</p>
-                      <label htmlFor="vtx" className="label mt-3">{t('claim.txt.value')}</label>
-                      <input id="vtx" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={`vc-domain-verify=${clean || 'nama'}.${domain},xxxxxxxx`} autoComplete="off" spellCheck={false} aria-invalid={touched && txtErr} />
-                      <p aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && txtErr ? t('claim.vtxt.err', { domain }) : ''}</p>
-                    </details>
-                  )}
-                  {genericTxt && (
-                    <details open className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)' }}>
-                      <summary className="cursor-pointer text-sm font-bold">{t('claim.txt.h')}</summary>
-                      <p className="hint mt-2">{t('claim.txt.hint')}</p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.6fr]">
-                        <div>
-                          <label htmlFor="gtl" className="label">{t('claim.txt.label')}</label>
-                          <input id="gtl" className="field" value={txtLabel ?? TXT_LABEL_DEFAULT[platform] ?? ''} onChange={(e) => setTxtLabel(e.target.value)} placeholder="_railway-verify" autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
+                    {genericTxt && (
+                      <details open className="rounded-lg border p-4" style={{ borderColor: 'var(--line-2)' }}>
+                        <summary className="cursor-pointer text-sm font-extrabold">{t('claim.txt.h')}</summary>
+                        <p className="hint mt-2">{t('claim.txt.hint')}</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.6fr]">
+                          <div>
+                            <label htmlFor="gtl" className="label">{t('claim.txt.label')}</label>
+                            <input id="gtl" className="field mono" value={txtLabel ?? TXT_LABEL_DEFAULT[platform] ?? ''} onChange={(e) => setTxtLabel(e.target.value)} placeholder="_railway-verify" autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
+                          </div>
+                          <div>
+                            <label htmlFor="gtv" className="label">{t('claim.txt.value')}</label>
+                            <input id="gtv" className="field mono" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={p.placeholder.TXT ?? ''} autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
+                          </div>
                         </div>
-                        <div>
-                          <label htmlFor="gtv" className="label">{t('claim.txt.value')}</label>
-                          <input id="gtv" className="field" value={txtValue} onChange={(e) => setTxtValue(e.target.value)} placeholder={p.placeholder.TXT ?? ''} autoComplete="off" spellCheck={false} aria-invalid={touched && genErr} aria-describedby="gtx-e" />
-                        </div>
-                      </div>
-                      <p id="gtx-e" aria-live="polite" className="mt-1 min-h-5 text-sm font-medium" style={{ color: 'var(--bad)' }}>{touched && genErr ? t('claim.txt.err') : ''}</p>
-                    </details>
-                  )}
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
-                    <input type="checkbox" checked={!guide} onChange={(e) => setGuide(!e.target.checked)} className="h-5 w-5 accent-[var(--accent-text)]" />
-                    {t('claim.skipGuide')}
-                  </label>
-                </div>
-                {guide && (
-                  <motion.ol initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card mt-6 grid gap-3 p-5 text-sm">
-                    {[1, 2, 3].map((n) => (<li key={n} className="grid grid-cols-[1.5rem_1fr] gap-2"><b style={{ color: 'var(--accent-text)' }}>{n}</b><span>{t(`plat.${p.id}.s${n}`)}</span></li>))}
-                    {p.docs && <li><a href={p.docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold" style={{ color: 'var(--accent-text)' }}>{t('plat.docs', { p: p.name })} <Icon.ext /></a></li>}
-                  </motion.ol>
-                )}
-              </div>
-              <div className="lg:sticky lg:top-24 lg:self-start">
-                <p className="label">{t('claim.preview')}</p>
-                <p className="card mb-4 break-all p-4 text-lg font-bold" aria-live="polite">https://<span className="mark">{clean}</span>.{domain}</p>
-                <DnsDiagram name={clean} type={type} value={value} platform={p.name} focus={focus} />
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="card p-6" style={{ boxShadow: 'var(--shadow)' }}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-2xl font-bold">{t('claim.s3.h')}</h2>
-                  <StatusBadge status={status} />
-                </div>
-                <p className="mt-2 break-all font-semibold">{host} <span style={{ color: 'var(--muted)' }}>({cur?.type ?? type} {cur?.value ?? value})</span></p>
-                <p className="hint mt-1">{t('claim.created', { type: cur?.type ?? type })}</p>
-
-                {rawStatus !== 'active' && cur && (
-                  <div className="mt-5 rounded-xl border-2 p-4" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-                    <p className="font-bold">{t('claim.lastStep', { p: p.name })}</p>
-                    <p className="hint mt-1">{t('claim.lastStepD', vars)}</p>
-                    <ol className="mt-3 grid gap-2 text-sm">
+                        <p id="gtx-e" aria-live="polite" className="mt-1 min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{touched && genErr ? t('claim.txt.err') : ''}</p>
+                      </details>
+                    )}
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold">
+                      <input type="checkbox" checked={!guide} onChange={(e) => setGuide(!e.target.checked)} className="h-5 w-5 accent-[var(--accent)]" />
+                      {t('claim.skipGuide')}
+                    </label>
+                  </div>
+                  {guide && (
+                    <motion.ol initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 grid gap-3 border-l-[3px] pl-5 text-sm" style={{ borderColor: 'var(--hl)' }}>
                       {[1, 2, 3].map((n) => (<li key={n} className="grid grid-cols-[1.5rem_1fr] gap-2"><b style={{ color: 'var(--accent-text)' }}>{n}</b><span>{t(`plat.${p.id}.s${n}`)}</span></li>))}
-                    </ol>
-                    {p.docs && <a href={p.docs} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--accent-text)' }}>{t('plat.docs', { p: p.name })} <Icon.ext /></a>}
+                      {p.docs && <li><a href={p.docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-bold underline" style={{ color: 'var(--accent-text)' }}>{t('plat.docs', { p: p.name })} <Icon.ext /></a></li>}
+                    </motion.ol>
+                  )}
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="relative">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-2xl">{t('claim.s3.h')}</h2>
+                    <StatusBadge status={status} />
                   </div>
-                )}
+                  <p className="mt-2 break-all font-bold">{host} <span className="mono text-sm font-medium" style={{ color: 'var(--muted)' }}>({cur?.type ?? type} {cur?.value ?? value})</span></p>
+                  <p className="hint mt-1">{t('claim.created', { type: cur?.type ?? type })}</p>
 
-                <div aria-live="polite" className="mt-5">
-                  {error && <p role="alert" className="mb-3 rounded-xl border-2 p-3 text-sm font-semibold" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{error}</p>}
-                  {polling && rawStatus !== 'active' && rawStatus !== 'suspended' && (
-                    <p className="rounded-xl border-2 p-3 text-sm font-medium" style={{ borderColor: 'var(--line)' }}>
-                      <span className="inline-flex items-center gap-2 font-semibold"><Spinner size={14} /> {t('claim.polling', { n: Math.min(tries + 1, MAX_TRIES), max: MAX_TRIES })}</span>
-                      {failKey && cur?.status === 'failed' && <span className="mt-1 block" style={{ color: 'var(--muted)' }}>{t('claim.pollingNow')} {t(failKey, vars)}</span>}
-                    </p>
+                  {rawStatus !== 'active' && cur && (
+                    <div className="mt-5 border-l-[3px] pl-5" style={{ borderColor: 'var(--hl)' }}>
+                      <p className="font-extrabold">{t('claim.lastStep', { p: p.name })}</p>
+                      <p className="hint mt-1">{t('claim.lastStepD', vars)}</p>
+                      <ol className="mt-3 grid gap-2 text-sm">
+                        {[1, 2, 3].map((n) => (<li key={n} className="grid grid-cols-[1.5rem_1fr] gap-2"><b style={{ color: 'var(--accent-text)' }}>{n}</b><span>{t(`plat.${p.id}.s${n}`)}</span></li>))}
+                      </ol>
+                      {p.docs && <a href={p.docs} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-bold underline" style={{ color: 'var(--accent-text)' }}>{t('plat.docs', { p: p.name })} <Icon.ext /></a>}
+                    </div>
                   )}
-                  {!polling && status === 'failed' && failKey && (
-                    <motion.div role="alert" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>
-                      <p className="font-bold">{t('claim.failed')}</p>
-                      <p className="mt-1 text-sm font-medium">{t(failKey, vars)}</p>
-                    </motion.div>
-                  )}
-                  {status === 'active' && (
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="rounded-xl border-2 p-4" style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }}>
-                      <p className="font-bold">{t('claim.success')}</p>
-                      <p className="mt-1 text-sm font-medium">{t('claim.successHint')}</p>
-                    </motion.div>
-                  )}
-                </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {status === 'active' ? (
-                    <Link to="/dashboard" className="btn btn-primary">{t('claim.toDashboard')}</Link>
-                  ) : (
-                    <>
-                      <button type="button" className="btn btn-primary" onClick={() => { setPolling(false); void runVerify() }} disabled={busy || !cur}>
-                        {busy ? <><Spinner /> {t('claim.verifying')}</> : status === 'failed' ? <><Icon.retry /> {t('claim.retry')}</> : t('claim.verify')}
-                      </button>
-                      <button type="button" className="btn" onClick={() => { setPolling(false); setStep(2) }}>{t('claim.editRecord')}</button>
-                    </>
-                  )}
+                  <div aria-live="polite" className="mt-5">
+                    {error && <p role="alert" className="mb-3 rounded-lg border-2 p-3 text-sm font-bold" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{error}</p>}
+                    {polling && rawStatus !== 'active' && rawStatus !== 'suspended' && (
+                      <p className="rounded-lg border p-3 text-sm font-medium" style={{ borderColor: 'var(--line-2)' }}>
+                        <span className="inline-flex items-center gap-2 font-bold"><Spinner size={14} /> {t('claim.polling', { n: Math.min(tries + 1, MAX_TRIES), max: MAX_TRIES })}</span>
+                        {failKey && cur?.status === 'failed' && <span className="mt-1 block" style={{ color: 'var(--muted)' }}>{t('claim.pollingNow')} {t(failKey, vars)}</span>}
+                      </p>
+                    )}
+                    {!polling && status === 'failed' && failKey && (
+                      <motion.div role="alert" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border-2 p-4" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>
+                        <p className="font-extrabold">{t('claim.failed')}</p>
+                        <p className="mt-1 text-sm font-medium">{t(failKey, vars)}</p>
+                      </motion.div>
+                    )}
+                    {status === 'active' && (
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-lg border-2 p-4" style={{ borderColor: 'var(--ok)', color: 'var(--ok)' }}>
+                        <Burst />
+                        <p className="font-extrabold">{t('claim.celebrate')}</p>
+                        <p className="mt-1 text-sm font-medium">{t('claim.successHint')}</p>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {status === 'active' ? (
+                      <>
+                        <a href={`https://${host}`} target="_blank" rel="noreferrer" className="btn btn-primary">{t('claim.visit')} <Icon.ext /></a>
+                        <Link to="/dashboard" className="btn">{t('claim.toDashboard')}</Link>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="btn btn-primary" onClick={() => { setPolling(false); void runVerify() }} disabled={busy || !cur}>
+                          {busy ? <><Spinner /> {t('claim.verifying')}</> : status === 'failed' ? <><Icon.retry /> {t('claim.retry')}</> : t('claim.verify')}
+                        </button>
+                        <button type="button" className="btn" onClick={() => { setPolling(false); setStep(2) }}>{t('claim.editRecord')}</button>
+                      </>
+                    )}
+                  </div>
+                  {status !== 'active' && <p className="hint mt-4">{t('claim.autoCheck')}</p>}
                 </div>
-                {status !== 'active' && <p className="hint mt-4">{t('claim.autoCheck')}</p>}
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {step < 3 && (
+            <div className="mt-10">
+              {error && step === 2 && <p role="alert" className="mb-4 max-w-xl rounded-lg border-2 p-3 text-sm font-bold" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{error}</p>}
+              <div className="flex flex-wrap gap-3">
+                {step > 0 && <button type="button" className="btn" onClick={() => { setError(''); setStep((s) => s - 1) }}><Icon.back /> {t('claim.back')}</button>}
+                <button type="button" className="btn btn-primary" onClick={next} disabled={!canNext || busy}>
+                  {busy ? <><Spinner /> {t('claim.saving')}</> : step === 2 ? t('claim.saveRecord') : t('claim.next')}
+                </button>
               </div>
-              <DnsDiagram name={clean} type={cur?.type ?? type} value={cur?.value ?? value} platform={p.name} focus={null} />
             </div>
           )}
-        </motion.div>
-      </AnimatePresence>
-
-      {step < 3 && (
-        <div className="mt-10">
-          {error && step === 2 && <p role="alert" className="mb-4 max-w-xl rounded-xl border-2 p-3 text-sm font-semibold" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{error}</p>}
-          <div className="flex flex-wrap gap-3">
-            {step > 0 && <button type="button" className="btn" onClick={() => { setError(''); setStep((s) => s - 1) }}><Icon.back /> {t('claim.back')}</button>}
-            <button type="button" className="btn btn-primary" onClick={next} disabled={!canNext || busy}>
-              {busy ? <><Spinner /> {t('claim.saving')}</> : step === 2 ? t('claim.saveRecord') : t('claim.next')}
-            </button>
-          </div>
         </div>
-      )}
+
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start" aria-label={t('claim.live')}>
+          <p className="label">{t('claim.live')}</p>
+          <Plate name={clean} size="md" stamp={step === 3 && status === 'active' ? t('status.active') : null}>
+            {step >= 2 && shownValue && (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="mono rounded-[3px] px-1.5 py-0.5 text-xs font-semibold" style={{ background: 'var(--hl)', color: 'var(--hl-ink)' }}>{shownType}</span>
+                <span className="mono min-w-0 truncate" style={{ color: 'var(--board-dim)' }}>{shownValue}</span>
+              </div>
+            )}
+          </Plate>
+          {step >= 1 && <div className="mt-8"><DnsDiagram name={clean} type={shownType} value={shownValue} platform={p.name} focus={step === 3 ? null : focus} /></div>}
+        </aside>
+      </div>
     </div>
   )
 }

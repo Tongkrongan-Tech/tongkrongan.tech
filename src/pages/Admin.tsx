@@ -138,7 +138,7 @@ export function Admin() {
       <div className="mx-auto max-w-md px-4 py-16">
         <h1 className="text-3xl font-extrabold tracking-tight">Moderasi</h1>
         <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>Khusus maintainer. Masukkan ADMIN_TOKEN. Token hanya disimpan di tab ini dan hilang saat tab ditutup.</p>
-        <form onSubmit={signIn} className="card mt-6 grid gap-4 p-6" style={{ boxShadow: 'var(--shadow)' }}>
+        <form onSubmit={signIn} className="card mt-6 grid gap-4 p-6">
           <div>
             <label htmlFor="adm-token" className="label">Token admin</label>
             <input id="adm-token" type="password" autoComplete="off" className="field" value={draft} onChange={(e) => setDraft(e.target.value)} aria-describedby="adm-err" />
@@ -152,13 +152,13 @@ export function Admin() {
 
   const Action = ({ id, kind, target, reason, label, disabled }: { id: string; kind: Confirm['kind']; target: string; reason?: string; label: string; disabled?: boolean }) => {
     const open = confirm?.id === id
-    if (!open) return <button type="button" className="btn !min-h-10 !px-3 !text-sm" disabled={disabled || busy} onClick={() => setConfirm({ id, kind, target, reason })}>{label}</button>
+    if (!open) return <button type="button" className="btn btn-sm" disabled={disabled || busy} onClick={() => setConfirm({ id, kind, target, reason })}>{label}</button>
     const danger = DESTRUCTIVE.includes(kind)
     return (
       <span role="group" aria-label="Konfirmasi" className="inline-flex flex-wrap items-center gap-2 rounded-xl border-2 p-1.5 pl-3 text-sm font-semibold" style={{ borderColor: danger ? 'var(--bad)' : 'var(--ok)' }}>
         {CONFIRM_TEXT[kind]}
-        <button type="button" className={`btn !min-h-9 !px-3 !text-sm ${danger ? 'btn-danger' : 'btn-primary'}`} disabled={busy} onClick={() => void run()}>{busy ? <Spinner /> : 'Ya, lanjut'}</button>
-        <button type="button" className="btn btn-ghost !min-h-9 !px-3 !text-sm" style={{ border: '2px solid var(--line)' }} disabled={busy} onClick={() => setConfirm(null)}>Batal</button>
+        <button type="button" className={`btn btn-sm ${danger ? 'btn-danger' : 'btn-primary'}`} disabled={busy} onClick={() => void run()}>{busy ? <Spinner /> : 'Ya, lanjut'}</button>
+        <button type="button" className="btn btn-sm btn-ghost" disabled={busy} onClick={() => setConfirm(null)}>Batal</button>
       </span>
     )
   }
@@ -171,8 +171,8 @@ export function Admin() {
           <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{reports ? `${reports.length} laporan terbuka` : 'Memuat laporan'}</p>
         </div>
         <div className="flex gap-2">
-          <button type="button" className="btn !min-h-10 !px-4 !text-sm" onClick={() => void load()} disabled={loading}>{loading ? <Spinner /> : 'Muat ulang'}</button>
-          <button type="button" className="btn btn-ghost !min-h-10 !px-4 !text-sm" style={{ border: '2px solid var(--line)' }} onClick={() => logout()}>Keluar</button>
+          <button type="button" className="btn btn-sm" onClick={() => void load()} disabled={loading}>{loading ? <Spinner /> : 'Muat ulang'}</button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => logout()}>Keluar</button>
         </div>
       </div>
 
@@ -190,7 +190,7 @@ export function Admin() {
           const i = info[r.name]
           const data = typeof i === 'object' ? i : null
           return (
-            <article key={r.id} className="card p-5" style={{ boxShadow: 'var(--shadow)' }}>
+            <article key={r.id} className="card p-5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="rounded-md border-2 px-2 py-0.5 text-xs font-extrabold" style={{ borderColor: meta.severe ? 'var(--bad)' : 'var(--line)', color: meta.severe ? 'var(--bad)' : 'var(--ink)' }}>{meta.label}</span>
                 <a href={`https://${r.name}.${domain}`} target="_blank" rel="noopener noreferrer nofollow" className="break-all text-lg font-extrabold underline-offset-4 hover:underline" style={{ color: 'var(--ink)' }}>{r.name}.{domain}</a>
@@ -199,7 +199,7 @@ export function Admin() {
               {r.detail && <p className="mt-3 whitespace-pre-wrap break-words rounded-xl p-3 text-sm" style={{ background: 'var(--surface-2)' }}>{r.detail}</p>}
 
               <div className="mt-4">
-                {!i && <button type="button" className="btn btn-ghost !min-h-10 !px-3 !text-sm" style={{ border: '2px solid var(--line)' }} onClick={() => void inspect(r.name)}>Periksa subdomain dan pemilik</button>}
+                {!i && <button type="button" className="btn btn-sm btn-ghost" onClick={() => void inspect(r.name)}>Periksa subdomain dan pemilik</button>}
                 {i === 'loading' && <p className="inline-flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--muted)' }}><Spinner /> Memeriksa</p>}
                 {i === 'missing' && <p className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>Subdomain ini sudah tidak ada.</p>}
                 {data && <Detail data={data} />}
@@ -211,7 +211,7 @@ export function Admin() {
                 {data && (data.owner_blocked
                   ? <Action id={`b-${r.id}`} kind="unblock" target={data.owner_email} label="Buka blokir pemilik" />
                   : <Action id={`b-${r.id}`} kind="block" target={data.owner_email} label="Blokir pemilik" />)}
-                <button type="button" className="btn btn-primary !min-h-10 !px-3 !text-sm sm:ml-auto" disabled={busy} onClick={() => void resolve(r.id)}>Tandai selesai</button>
+                <button type="button" className="btn btn-primary btn-sm sm:ml-auto" disabled={busy} onClick={() => void resolve(r.id)}>Tandai selesai</button>
               </div>
             </article>
           )
@@ -237,7 +237,7 @@ export function Admin() {
                 <p className="mt-2 break-all text-sm font-semibold" style={{ color: 'var(--muted)' }}>Pemilik: {rv.owner_email}{rv.owner_blocked ? ' (diblokir)' : ''}</p>
                 <p className="mt-1 break-all text-sm" style={{ color: 'var(--muted)' }}>Tujuan: {rv.platform} &middot; {rv.type} &middot; {rv.value}</p>
                 <div className="mt-3">
-                  {!i && <button type="button" className="btn btn-ghost !min-h-10 !px-3 !text-sm" style={{ border: '2px solid var(--line)' }} onClick={() => void inspect(rv.name)}>Periksa subdomain dan pemilik</button>}
+                  {!i && <button type="button" className="btn btn-sm btn-ghost" onClick={() => void inspect(rv.name)}>Periksa subdomain dan pemilik</button>}
                   {i === 'loading' && <p className="inline-flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--muted)' }}><Spinner /> Memeriksa</p>}
                   {i === 'missing' && <p className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>Subdomain ini sudah tidak ada.</p>}
                   {data && <Detail data={data} />}

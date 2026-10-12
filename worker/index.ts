@@ -1,4 +1,5 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
+import { classifyName } from '../src/lib/reserved'
 import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
@@ -199,6 +200,15 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
       free = cands.filter((c) => !t.has(c))
     }
     return json({ state: 'taken', mine: row.user_id === user?.id, suggestions: free.slice(0, 3) })
+  },
+
+  // Daftar publik untuk ticker beranda: hanya nama aktif, pemilik tidak diblokir, nama yang tidak menyerupai merek/tokoh.
+  // Tanpa data pemilik, dibatasi 30 nama terbaru, dan boleh di-cache agar tidak bisa dipakai memindai semua nama.
+  'GET /api/public/subdomains': async (req, env) => {
+    if (!(await rateLimit(env, `pub:${clientIp(req)}`, 60, 60))) throw new HttpError(429, 'rate_limited')
+    const rows = await env.DB.prepare("SELECT s.name FROM subdomains s JOIN users u ON u.id = s.user_id WHERE s.status = 'active' AND u.blocked = 0 ORDER BY s.activated_at DESC LIMIT 80").all<{ name: string }>()
+    const names = rows.results.map((r) => r.name).filter((n) => !classifyName(n).review && !reservedExtra(env).includes(n)).slice(0, 30)
+    return json({ names }, 200, { 'cache-control': 'public, max-age=300' })
   },
 
   'GET /api/auth/me': async (req, env) => {

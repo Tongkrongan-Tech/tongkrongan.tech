@@ -1,65 +1,97 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
-import { usePrefs, THEMES, type Theme } from '../lib/prefs'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { usePrefs, THEMES, type ResolvedTheme } from '../lib/prefs'
 import { useStore } from '../lib/store'
 import { useRouteSeo } from '../lib/seo'
 import { Icon, Spinner } from './ui'
+import { ScrollBar } from './fx'
 
-const SWATCH: Record<Theme, [string, string]> = {
-  light: ['#f6f8fc', '#1565f0'], dark: ['#0f1219', '#5b9bff'], kopi: ['#fbf6ee', '#ff6b3d'], mint: ['#e6f4ea', '#3ddc84'], grape: ['#efe9fb', '#b79cff'], ocean: ['#0b2545', '#5ce1e6'],
-}
-
-export function Logo() {
+export function Logo({ className = 'h-6 sm:h-7' }: { className?: string }) {
   return (
     <Link to="/" className="inline-flex items-center no-underline" aria-label="Tongkrongan.tech">
-      <img src="/logo-wordmark.png" alt="Tongkrongan.tech" width="640" height="77" className="logo-art h-6 w-auto sm:h-7" />
+      <img src="/logo-wordmark.png" alt="Tongkrongan.tech" width="640" height="77" className={`logo-art w-auto ${className}`} />
     </Link>
   )
 }
 
-// Satu tombol kecil untuk bahasa dan tema, supaya bilah atas tidak penuh.
-function Settings() {
-  const { theme, setTheme, lang, setLang, t } = usePrefs()
-  const [open, setOpen] = useState(false)
+/* Dua warna tiap tema (kertas dan aksen) untuk pratinjau kecil di pemilih. */
+const SWATCH: Record<ResolvedTheme, [string, string]> = {
+  light: ['#f4f7fd', '#1553e0'], dark: ['#0a0e18', '#2563eb'], kopi: ['#f9f1e4', '#ff6b3d'], mint: ['#e8f3e3', '#34c47a'], grape: ['#f0eafb', '#a98bff'], ocean: ['#061a33', '#4fd8dd'],
+}
+
+function Swatch({ id, size = 22 }: { id: ResolvedTheme; size?: number }) {
+  return (
+    <span aria-hidden="true" className="flex shrink-0 overflow-hidden rounded-[5px] border-[1.5px]" style={{ borderColor: 'var(--ink)' }}>
+      <span style={{ width: size, height: size, background: SWATCH[id][0] }} /><span style={{ width: size, height: size, background: SWATCH[id][1] }} />
+    </span>
+  )
+}
+
+/* Pengaturan: bahasa dan enam tema dalam satu panel. Memilih tema membuka lingkaran dari titik klik (View Transitions);
+   tanpa dukungan atau saat gerak dikurangi, berganti langsung. */
+function Settings({ inline = false }: { inline?: boolean }) {
+  const { theme, resolved, setTheme, lang, setLang, t } = usePrefs()
+  const reduce = useReducedMotion()
+  const [open, setOpen] = useState(inline)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!open) return
+    if (!open || inline) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('keydown', onKey); document.addEventListener('mousedown', onDown)
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
-  }, [open])
-  const head = 'px-2 pb-1 pt-1 text-xs font-bold uppercase tracking-wider'
+  }, [open, inline])
+
+  function pick(next: ResolvedTheme, e: React.MouseEvent<HTMLButtonElement>) {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { ready: Promise<void> } }
+    if (reduce || !doc.startViewTransition) { setTheme(next); return }
+    const x = e.clientX || innerWidth / 2, y = e.clientY || 0
+    const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))
+    const vt = doc.startViewTransition(() => flushSync(() => setTheme(next)))
+    void vt.ready.then(() => document.documentElement.animate(
+      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+      { duration: 650, easing: 'cubic-bezier(.4,0,.2,1)', pseudoElement: '::view-transition-new(root)' },
+    ))
+  }
+
+  const head = 'px-1 pb-1.5 pt-1 text-xs font-extrabold'
+  const panel = (
+    <>
+      <p className={head} style={{ color: 'var(--muted)' }}>{t('lang.label')}</p>
+      <div role="group" aria-label={t('lang.label')} className="mb-3 grid grid-cols-2 gap-2">
+        {(['id', 'en'] as const).map((l) => (
+          <button key={l} type="button" onClick={() => setLang(l)} aria-pressed={lang === l} className="btn btn-sm uppercase" style={{ background: lang === l ? 'var(--hl)' : 'var(--surface)', color: lang === l ? 'var(--hl-ink)' : 'var(--ink)' }}>{l}</button>
+        ))}
+      </div>
+      <p className={head} style={{ color: 'var(--muted)' }}>{t('theme.label')}</p>
+      <div role="radiogroup" aria-label={t('theme.label')} className="grid gap-0.5">
+        {THEMES.map((th) => {
+          const on = resolved === th
+          return (
+            <button key={th} role="radio" aria-checked={on} type="button" onClick={(e) => pick(th, e)} className="relative flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 p-2 text-left text-sm font-bold hover:bg-[var(--surface-2)]" style={{ background: on ? 'var(--surface-2)' : 'transparent', color: 'var(--ink)' }}>
+              <Swatch id={th} />
+              <span className="flex-1">{t(`theme.${th}`)}</span>
+              {on && <motion.span layoutId={inline ? 'th-check-m' : 'th-check'} className="grid place-items-center" style={{ color: 'var(--accent-text)' }}><Icon.check size={16} /></motion.span>}
+            </button>
+          )
+        })}
+      </div>
+      {theme === 'system' && <p className="hint mt-2 px-1">{t('theme.auto')}</p>}
+    </>
+  )
+  if (inline) return <div className="card p-3">{panel}</div>
   return (
     <div ref={ref} className="relative">
-      <button type="button" className="btn btn-ghost !min-h-10 !gap-2 !px-3" style={{ border: '2px solid var(--line)' }} aria-haspopup="true" aria-expanded={open} aria-label={`${t('theme.label')}, ${t('lang.label')}`} onClick={() => setOpen((o) => !o)}>
-        <span className="flex overflow-hidden rounded-full border-2" style={{ borderColor: 'var(--line)' }} aria-hidden="true">
-          <span className="block h-4 w-4" style={{ background: SWATCH[theme][0] }} /><span className="block h-4 w-4" style={{ background: SWATCH[theme][1] }} />
-        </span>
-        <span className="text-sm font-bold uppercase" aria-hidden="true">{lang}</span>
+      <button type="button" className="btn btn-outline btn-sm gap-2" aria-haspopup="true" aria-expanded={open} aria-label={`${t('theme.label')}, ${t('lang.label')}`} onClick={() => setOpen((o) => !o)}>
+        <Swatch id={resolved} size={14} />
+        <span className="text-xs font-extrabold uppercase" aria-hidden="true">{lang}</span>
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, y: -8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="card fixed inset-x-3 top-[4.5rem] z-50 p-2 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]" style={{ boxShadow: 'var(--shadow)' }}>
-            <p className={head} style={{ color: 'var(--muted)' }}>{t('lang.label')}</p>
-            <div role="group" aria-label={t('lang.label')} className="mb-2 flex gap-2 px-2">
-              {(['id', 'en'] as const).map((l) => (
-                <button key={l} type="button" onClick={() => setLang(l)} aria-pressed={lang === l} className="min-h-10 flex-1 cursor-pointer rounded-lg border-2 text-sm font-bold uppercase" style={{ borderColor: 'var(--line)', background: lang === l ? 'var(--hl)' : 'transparent', color: lang === l ? 'var(--hl-ink)' : 'var(--ink)' }}>{l}</button>
-              ))}
-            </div>
-            <p className={head} style={{ color: 'var(--muted)' }}>{t('theme.label')}</p>
-            <div role="radiogroup" aria-label={t('theme.label')}>
-              {THEMES.map((th) => (
-                <button key={th} role="radio" aria-checked={theme === th} type="button" onClick={() => { setTheme(th); setOpen(false) }} className="flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 p-2 text-left text-sm font-semibold transition-colors hover:bg-[var(--surface-2)]" style={{ background: theme === th ? 'var(--surface-2)' : 'transparent', color: 'var(--ink)' }}>
-                  <span className="flex overflow-hidden rounded-lg border-2" style={{ borderColor: 'var(--line)' }} aria-hidden="true">
-                    <span className="block h-7 w-7" style={{ background: SWATCH[th][0] }} /><span className="block h-7 w-7" style={{ background: SWATCH[th][1] }} />
-                  </span>
-                  <span className="flex-1">{t(`theme.${th}`)}</span>
-                  {theme === th && <Icon.check size={16} />}
-                </button>
-              ))}
-            </div>
+          <motion.div initial={{ opacity: 0, y: -8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="card absolute right-0 top-full z-50 mt-2 w-[20rem] max-w-[calc(100vw-2rem)] p-3" style={{ borderColor: 'var(--ink)', borderWidth: 2, boxShadow: '5px 5px 0 var(--sh)' }}>
+            {panel}
           </motion.div>
         )}
       </AnimatePresence>
@@ -67,7 +99,7 @@ function Settings() {
   )
 }
 
-const navCls = ({ isActive }: { isActive: boolean }) => `rounded-lg px-3 py-1.5 text-sm font-semibold no-underline transition-colors ${isActive ? 'bg-[var(--hl)] text-[var(--hl-ink)]' : 'text-[var(--ink)] hover:bg-[var(--surface-2)]'}`
+const navCls = ({ isActive }: { isActive: boolean }) => `px-3 py-2 text-sm font-semibold no-underline underline-offset-8 hover:underline ${isActive ? 'underline' : ''}`
 
 export function Layout() {
   const { t, configError } = usePrefs()
@@ -88,64 +120,72 @@ export function Layout() {
     if (!menu) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false) }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = '' }
   }, [menu])
 
-  const links = (
-    <>
-      <NavLink to="/claim" className={navCls}>{t('nav.claim')}</NavLink>
-      <Link to="/#platform" className={navCls({ isActive: false })}>{t('nav.platform')}</Link>
-      <Link to="/#faq" className={navCls({ isActive: false })}>{t('nav.faq')}</Link>
-      {user && <NavLink to="/dashboard" className={navCls}>{t('nav.dashboard')}</NavLink>}
-    </>
-  )
-  const mobileExtra = (
-    <>
-      {!user && <NavLink to="/dashboard" className={navCls}>{t('nav.dashboard')}</NavLink>}
-      <NavLink to="/report" className={navCls}>{t('nav.report')}</NavLink>
-    </>
-  )
+  const links = [
+    { to: '/#cara', label: t('nav.how') },
+    { to: '/#platform', label: t('nav.platform') },
+    { to: '/#faq', label: t('nav.faq') },
+  ]
 
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-[var(--hl)] focus:px-4 focus:py-2 focus:text-[var(--hl-ink)]">{t('nav.skip')}</a>
-      <header className="sticky top-0 z-40 border-b-2" style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}>
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr]">
-          <div className="justify-self-start"><Logo /></div>
-          <nav className="hidden items-center gap-1 lg:flex" aria-label={t('nav.main')}>{links}</nav>
-          <div className="ml-auto flex items-center gap-2 lg:justify-self-end">
+      <ScrollBar />
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-[var(--hl)] focus:px-4 focus:py-2 focus:text-[var(--hl-ink)]">{t('nav.skip')}</a>
+
+      <header className="fixed inset-x-0 top-0 z-50 border-b-[1.5px]" style={{ background: 'var(--bg)', borderColor: 'var(--ink)' }}>
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+          <Logo />
+          <nav className="ml-6 hidden items-center lg:flex" aria-label={t('nav.main')}>
+            {links.map((l) => <Link key={l.to} to={l.to} className={navCls({ isActive: false })}>{l.label}</Link>)}
+            <NavLink to="/report" className={navCls}>{t('nav.report')}</NavLink>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
             <Settings />
             {user ? (
-              <button type="button" onClick={() => void logout()} className="btn !hidden !min-h-10 !px-4 !text-sm sm:!inline-flex">{t('nav.logout')}</button>
+              <>
+                <Link to="/dashboard" className="btn btn-sm !hidden sm:!inline-flex">{t('nav.dashboard')}</Link>
+                <button type="button" onClick={() => void logout()} className="btn btn-sm btn-ghost !hidden lg:!inline-flex">{t('nav.logout')}</button>
+              </>
             ) : (
-              <Link to="/login" className="btn btn-primary !hidden !min-h-10 !px-4 !text-sm sm:!inline-flex">{t('nav.login')}</Link>
+              <>
+                <Link to="/login" className="btn btn-sm btn-ghost !hidden sm:!inline-flex">{t('nav.login')}</Link>
+                <Link to="/claim" className="btn btn-sm btn-primary !hidden sm:!inline-flex">{t('nav.start')}</Link>
+              </>
             )}
-            <button type="button" className="btn btn-ghost !min-h-10 !px-3 lg:!hidden" style={{ border: '2px solid var(--line)' }} aria-expanded={menu} aria-controls="mobile-menu" aria-label={menu ? t('nav.closeMenu') : t('nav.openMenu')} onClick={() => setMenu((m) => !m)}>
-              {menu ? <Icon.x size={22} /> : <Icon.menu />}
+            <button type="button" className="btn btn-outline btn-sm !w-9 !px-0 lg:!hidden" aria-expanded={menu} aria-controls="mobile-menu" aria-label={menu ? t('nav.closeMenu') : t('nav.openMenu')} onClick={() => setMenu((m) => !m)}>
+              {menu ? <Icon.x size={20} /> : <Icon.menu size={20} />}
             </button>
           </div>
         </div>
-        <AnimatePresence>
-          {menu && (
-            <motion.nav id="mobile-menu" aria-label={t('nav.main')} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t-2 lg:hidden" style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}>
-              <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-3 [&>a]:min-h-11 [&>a]:content-center">
-                {links}
-                {mobileExtra}
-                {user ? (
-                  <button type="button" onClick={() => void logout()} className="btn mt-2">{t('nav.logout')}</button>
-                ) : (
-                  <Link to="/login" className="btn btn-primary mt-2">{t('nav.login')}</Link>
-                )}
-              </div>
-            </motion.nav>
-          )}
-        </AnimatePresence>
       </header>
-      {configError && <p role="alert" className="px-4 py-3 text-center text-sm font-semibold" style={{ background: 'var(--bad)', color: 'var(--bg)' }}>{t('config.error')}</p>}
-      <main id="main" className="flex-1" tabIndex={-1}>
+
+      <AnimatePresence>
+        {menu && (
+          <motion.nav id="mobile-menu" aria-label={t('nav.main')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 overflow-y-auto px-5 pb-8 pt-20 lg:hidden" style={{ background: 'var(--bg)' }}>
+            <ul className="grid">
+              {[...links, { to: '/claim', label: t('nav.claim') }, { to: '/dashboard', label: t('nav.dashboard') }, { to: '/report', label: t('nav.report') }].map((l, i) => (
+                <motion.li key={l.to} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.03 * i + 0.04 }}>
+                  <Link to={l.to} className="flex min-h-14 items-center border-b py-3 text-2xl font-extrabold tracking-tight no-underline" style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}>{l.label}</Link>
+                </motion.li>
+              ))}
+            </ul>
+            <div className="mt-8"><Settings inline /></div>
+            <div className="mt-6">
+              {user ? <button type="button" onClick={() => void logout()} className="btn">{t('nav.logout')}</button> : <Link to="/login" className="btn btn-primary">{t('nav.login')}</Link>}
+            </div>
+          </motion.nav>
+        )}
+      </AnimatePresence>
+
+      {configError && <p role="alert" className="fixed inset-x-0 top-[4.5rem] z-40 mx-auto w-fit max-w-[92vw] rounded-md border-2 px-4 py-2 text-center text-sm font-bold" style={{ background: 'var(--surface)', borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t('config.error')}</p>}
+
+      <main id="main" className="relative flex-1 pt-16" tabIndex={-1}>
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={loc.pathname} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-            <Suspense fallback={<div className="grid min-h-[50vh] place-items-center" style={{ color: 'var(--accent-text)' }} role="status" aria-label={t('ui.loading')}><Spinner size={36} /></div>}>
+          <motion.div key={loc.pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
+            <Suspense fallback={<div className="grid min-h-[60vh] place-items-center" style={{ color: 'var(--accent-text)' }} role="status" aria-label={t('ui.loading')}><Spinner size={34} /></div>}>
               <Outlet />
             </Suspense>
           </motion.div>
@@ -158,51 +198,33 @@ export function Layout() {
 
 function Footer() {
   const { t, config, domain } = usePrefs()
-  const col = 'mb-3 text-xs font-bold uppercase tracking-wider'
   const link = 'inline-block py-1.5 text-sm font-semibold underline-offset-4 hover:underline'
   return (
-    <footer className="border-t-2" style={{ borderColor: 'var(--line)', background: 'var(--surface-2)' }}>
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-12 sm:px-6">
-        <div className="grid gap-10 lg:grid-cols-[1.6fr_2fr]">
-          <div>
-            <img src="/logo-full.png" alt="Tongkrongan.tech, subdomain gratis untuk project kamu" width="720" height="428" loading="lazy" className="logo-art h-auto w-44" />
-            <p className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{t('footer.about')}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-          <nav aria-label={t('footer.start')}>
-            <p className={col} style={{ color: 'var(--muted)' }}>{t('footer.start')}</p>
-            <ul>
-              <li><Link to="/claim" className={link} style={{ color: 'var(--ink)' }}>{t('nav.claim')}</Link></li>
-              <li><Link to="/dashboard" className={link} style={{ color: 'var(--ink)' }}>{t('nav.dashboard')}</Link></li>
-              <li><Link to="/#platform" className={link} style={{ color: 'var(--ink)' }}>{t('nav.platform')}</Link></li>
-            </ul>
-          </nav>
-          <nav aria-label={t('footer.info')}>
-            <p className={col} style={{ color: 'var(--muted)' }}>{t('footer.info')}</p>
-            <ul>
-              <li><Link to="/#rules" className={link} style={{ color: 'var(--ink)' }}>{t('footer.rules')}</Link></li>
-              <li><Link to="/#faq" className={link} style={{ color: 'var(--ink)' }}>{t('nav.faq')}</Link></li>
-              <li><Link to="/report" className={link} style={{ color: 'var(--ink)' }}>{t('nav.report')}</Link></li>
-            </ul>
-          </nav>
-          <nav aria-label={t('footer.legal')}>
-            <p className={col} style={{ color: 'var(--muted)' }}>{t('footer.legal')}</p>
-            <ul>
-              <li><Link to="/terms" className={link} style={{ color: 'var(--ink)' }}>{t('legal.terms')}</Link></li>
-              <li><Link to="/privacy" className={link} style={{ color: 'var(--ink)' }}>{t('legal.privacy')}</Link></li>
-            </ul>
-          </nav>
-          </div>
+    <footer className="border-t-[1.5px]" style={{ borderColor: 'var(--ink)', background: 'var(--surface-2)' }}>
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.3fr_1fr]">
+        <div>
+          <img src="/logo-full.png" alt="Tongkrongan.tech" width="720" height="428" loading="lazy" className="logo-art h-auto w-28" />
+          <p className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{t('footer.about')}</p>
+          <ul className="mt-5 grid gap-1.5 text-sm font-semibold">
+            {['footer.p1', 'footer.p2', 'footer.p3'].map((k) => <li key={k} className="flex items-start gap-2"><span style={{ color: 'var(--ok)' }}><Icon.check size={16} /></span>{t(k)}</li>)}
+          </ul>
         </div>
-
-        <ul className="mt-10 flex flex-wrap gap-3 border-t-2 pt-6" style={{ borderColor: 'var(--line)' }}>
-          {['footer.p1', 'footer.p2', 'footer.p3'].map((k) => (
-            <li key={k} className="badge" style={{ color: 'var(--ink)' }}><Icon.check size={14} /> {t(k)}</li>
-          ))}
-        </ul>
+        <nav aria-label={t('footer.nav')} className="grid grid-cols-2 gap-x-6">
+          <ul>
+            <li><Link to="/claim" className={link}>{t('nav.claim')}</Link></li>
+            <li><Link to="/dashboard" className={link}>{t('nav.dashboard')}</Link></li>
+            <li><Link to="/#platform" className={link}>{t('nav.platform')}</Link></li>
+            <li><Link to="/#faq" className={link}>{t('nav.faq')}</Link></li>
+          </ul>
+          <ul>
+            <li><Link to="/report" className={link}>{t('nav.report')}</Link></li>
+            <li><Link to="/terms" className={link}>{t('legal.terms')}</Link></li>
+            <li><Link to="/privacy" className={link}>{t('legal.privacy')}</Link></li>
+          </ul>
+        </nav>
       </div>
-      <div className="border-t-2" style={{ borderColor: 'var(--line)' }}>
-        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6" style={{ color: 'var(--muted)' }}>
+      <div className="border-t" style={{ borderColor: 'var(--line-2)' }}>
+        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 text-xs sm:flex-row sm:justify-between sm:px-6" style={{ color: 'var(--muted)' }}>
           <span>&copy; {new Date().getFullYear()} Tongkrongan.tech</span>
           <span>{config?.mock ? t('footer.mock') : t('footer.copy', { domain })}</span>
         </div>

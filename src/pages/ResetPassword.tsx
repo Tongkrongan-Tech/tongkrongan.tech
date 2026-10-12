@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import { api } from '../lib/api'
 import { Spinner } from '../components/ui'
@@ -28,25 +29,25 @@ export function ResetPassword() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-12 sm:py-20">
-      <h1 className="text-4xl font-extrabold leading-tight tracking-tight">{t('reset.h')}</h1>
+    <div className="mx-auto max-w-md px-4 py-16 sm:py-24">
+      <h1 className="text-4xl">{t('reset.h')}</h1>
       {!token ? (
-        <div className="card mt-8 grid gap-4 p-6" style={{ boxShadow: 'var(--shadow)' }}>
-          <p role="alert" className="font-semibold" style={{ color: 'var(--bad)' }}>{t('reset.notoken')}</p>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-8 grid gap-4 border-l-[3px] pl-5" style={{ borderColor: 'var(--bad)' }}>
+          <p role="alert" className="font-bold" style={{ color: 'var(--bad)' }}>{t('reset.notoken')}</p>
           <Link to="/login?forgot=1" className="btn btn-primary no-underline">{t('reset.notoken.link')}</Link>
-        </div>
+        </motion.div>
       ) : (
-      <form onSubmit={submit} noValidate className="card mt-8 grid gap-5 p-6" style={{ boxShadow: 'var(--shadow)' }}>
-        <div>
-          <label htmlFor="npw" className="label">{t('login.pw')}</label>
-          <div className="relative">
-            <input id="npw" type={show ? 'text' : 'password'} autoComplete="new-password" className="field !pr-20" value={pw} onChange={(e) => setPw(e.target.value)} />
-            <button type="button" onClick={() => setShow((v) => !v)} aria-pressed={show} aria-label={show ? t('login.hide') : t('login.show')} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-1 text-sm font-semibold underline" style={{ color: 'var(--accent-text)' }}>{show ? t('pw.hide') : t('pw.show')}</button>
+        <motion.form initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} onSubmit={submit} noValidate className="mt-8 grid gap-5">
+          <div>
+            <label htmlFor="npw" className="label">{t('login.pw')}</label>
+            <div className="relative">
+              <input id="npw" type={show ? 'text' : 'password'} autoComplete="new-password" className="field !pr-20" value={pw} onChange={(e) => setPw(e.target.value)} />
+              <button type="button" onClick={() => setShow((v) => !v)} aria-pressed={show} aria-label={show ? t('login.hide') : t('login.show')} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-1 text-sm font-bold underline" style={{ color: 'var(--accent-text)' }}>{show ? t('pw.hide') : t('pw.show')}</button>
+            </div>
           </div>
-        </div>
-        <p role="alert" className="min-h-5 text-sm font-semibold" style={{ color: 'var(--bad)' }}>{err}</p>
-        <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? <Spinner /> : t('reset.submit')}</button>
-      </form>
+          <p role="alert" className="min-h-5 text-sm font-bold" style={{ color: 'var(--bad)' }}>{err}</p>
+          <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>{busy ? <Spinner /> : t('reset.submit')}</button>
+        </motion.form>
       )}
     </div>
   )
