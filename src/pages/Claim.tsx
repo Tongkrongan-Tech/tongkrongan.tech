@@ -9,6 +9,8 @@ import { PLATFORMS, platformById, validateValue, type PlatformId, type RecordTyp
 import { checkName } from '../lib/names'
 import { NameChecker, useNameCheck } from '../components/NameChecker'
 import { Csat } from '../components/Csat'
+import { OwnershipProof } from '../components/OwnershipProof'
+import { radioKeys } from '../components/ui'
 import { track } from '../lib/track'
 import { DnsDiagram } from '../components/DnsDiagram'
 import { Plate } from '../components/Plate'
@@ -28,6 +30,8 @@ export function Claim() {
 
   const initial = (params.get('name') ?? '').toLowerCase()
   const [step, setStep] = useState(0)
+  const previousStep = useRef(0)
+  const stepRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState(initial)
   const [platform, setPlatform] = useState<PlatformId>('vercel')
   const [type, setType] = useState<RecordType>('CNAME')
@@ -173,7 +177,12 @@ export function Claim() {
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_24rem]">
         <div className="min-w-0">
           <AnimatePresence mode="wait">
-            <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}>
+            <motion.div ref={stepRef} key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }} onAnimationComplete={() => {
+              if (previousStep.current === step) return
+              previousStep.current = step
+              const heading = stepRef.current?.querySelector('h2')
+              if (heading) { heading.tabIndex = -1; heading.focus() }
+            }}>
               {step === 0 && (
                 <div className="max-w-2xl">
                   <h2 className="mb-5 text-2xl">{t('claim.s0.h')}</h2>
@@ -186,11 +195,11 @@ export function Claim() {
               {step === 1 && (
                 <div>
                   <h2 className="text-2xl">{t('claim.s1.h')}</h2>
-                  <div className="mt-6 border-t-[1.5px]" style={{ borderColor: 'var(--ink)' }} role="radiogroup" aria-label={t('claim.s1.h')}>
+                  <div className="mt-6 border-t-[1.5px]" style={{ borderColor: 'var(--ink)' }} role="radiogroup" aria-label={t('claim.s1.h')} onKeyDown={radioKeys}>
                     {PLATFORMS.map((x) => {
                       const on = platform === x.id
                       return (
-                        <button key={x.id} type="button" role="radio" aria-checked={on} onClick={() => { if (x.id !== platform) { setTxtValue(''); setTxtLabel(null) } setPlatform(x.id); setType(x.defaultType); setValues({}) }}
+                        <button key={x.id} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} onClick={() => { if (x.id !== platform) { setTxtValue(''); setTxtLabel(null) } setPlatform(x.id); setType(x.defaultType); setValues({}) }}
                           className="flex w-full cursor-pointer items-center justify-between gap-4 border-0 border-b px-3 py-4 text-left" style={{ borderColor: 'var(--line-2)', background: on ? 'var(--hl)' : 'transparent', color: on ? 'var(--hl-ink)' : 'var(--ink)' }}>
                           <span>
                             <span className="block text-lg font-extrabold tracking-tight">{x.name}</span>
@@ -231,9 +240,9 @@ export function Claim() {
                   <div className="mt-5 grid gap-6">
                     <div>
                       <span id="rtype-l" className="label">{t('claim.type')}</span>
-                      <div role="radiogroup" aria-labelledby="rtype-l" className="flex flex-wrap gap-2" onFocus={() => setFocus('type')}>
+                      <div role="radiogroup" aria-labelledby="rtype-l" className="flex flex-wrap gap-2" onFocus={() => setFocus('type')} onKeyDown={radioKeys}>
                         {p.types.map((ty) => (
-                          <button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)} className="btn btn-sm mono" style={{ background: type === ty ? 'var(--hl)' : 'var(--surface)', color: type === ty ? 'var(--hl-ink)' : 'var(--ink)' }}>{ty}</button>
+                          <button key={ty} type="button" role="radio" aria-checked={type === ty} tabIndex={type === ty ? 0 : -1} onClick={() => setType(ty)} className="btn btn-sm mono" style={{ background: type === ty ? 'var(--hl)' : 'var(--surface)', color: type === ty ? 'var(--hl-ink)' : 'var(--ink)' }}>{ty}</button>
                         ))}
                       </div>
                       <p className="hint mt-2">{t(`type.${type}`)}</p>
@@ -294,6 +303,7 @@ export function Claim() {
                   </div>
                   <p className="mt-2 break-all font-bold">{host} <span className="mono text-sm font-medium" style={{ color: 'var(--muted)' }}>({cur?.type ?? type} {cur?.value ?? value})</span></p>
                   <p className="hint mt-1">{t('claim.created', { type: cur?.type ?? type })}</p>
+                  {cur && <OwnershipProof sub={cur} />}
 
                   {rawStatus !== 'active' && cur && (
                     <div className="mt-5 border-l-[3px] pl-5" style={{ borderColor: 'var(--hl)' }}>

@@ -1,6 +1,6 @@
 import type { Env } from './lib'
 import type { RecordType } from '../src/lib/dns'
-import { desecCreate, desecDelete, desecUpdate } from './desec'
+import { desecCreate, desecDelete, desecUpdate } from './desec.ts'
 
 const CF = 'https://api.cloudflare.com/client/v4'
 export const isMock = (env: Env) => env.DNS_MODE !== 'live'
@@ -42,7 +42,7 @@ export async function deleteRecord(env: Env, recordId: string | null) {
 // `_vercel` memang harus di domain induk (syarat Vercel), selain itu TXT tambahan di bawah subdomain pengguna.
 export const txtHost = (env: Env, label: string, name: string) => label === '_vercel' ? `_vercel.${env.BASE_DOMAIN}` : `${label}.${name}.${env.BASE_DOMAIN}`
 
-export type VerifyFail = 'dns' | 'http' | 'platform'
+export type VerifyFail = 'dns' | 'http' | 'platform' | 'ownership'
 export type VerifyOutcome = { ok: true } | { ok: false; reason: VerifyFail }
 
 async function doh(name: string, type: string): Promise<string[]> {
@@ -57,12 +57,8 @@ async function timedFetch(url: string, init: RequestInit = {}) {
   try { return await fetch(url, { ...init, signal: c.signal, redirect: init.redirect ?? 'follow' }) } finally { clearTimeout(t) }
 }
 
-// Verifikasi otomatis, tanpa berkas bukti:
-// (1) DNS sudah menjawab sesuai record; (2) untuk tujuan situs, situs benar-benar tampil di alamat ini.
-// Platform (Vercel, Cloudflare Pages, Railway) hanya menyajikan domain yang sudah ditambahkan pemilik proyek,
-// jadi respons sukses itu sendiri menjadi bukti kendali atas tujuan.
-// Hanya respons 2xx yang dianggap bukti. Redirect (3xx) tidak diikuti, jadi halaman placeholder yang mengalihkan ke tempat lain tidak lolos.
-export async function verifyRecord(env: Env, s: { name: string; type: RecordType; value: string }): Promise<VerifyOutcome> {
+// Token tidak dikirim di URL/header: server yang sekadar memantulkan request tidak dapat membuktikan kendali.
+export async function verifyRecord(env: Env, s: { name: string; type: RecordType; value: string; ownership_token?: string | null }): Promise<VerifyOutcome> {
   // Mode mock (hanya lokal): nilai yang mengandung "fail" memicu kegagalan agar jalur galat bisa diuji.
   if (isMock(env)) return s.value.includes('fail') ? { ok: false, reason: 'platform' } : { ok: true }
   const host = hostOf(env, s.name)
@@ -71,15 +67,33 @@ export async function verifyRecord(env: Env, s: { name: string; type: RecordType
   const match = s.type === 'AAAA' ? got.some((g) => g.replace(/:0+/g, ':') === want.replace(/:0+/g, ':') || g === want) : got.includes(want)
   if (!match) return { ok: false, reason: 'dns' }
   if (s.type === 'TXT') return { ok: false, reason: 'dns' } // TXT tidak boleh jadi tipe utama; verifikasi lewat tipe lain
+  if (!s.ownership_token || !/^[a-f0-9]{64}$/.test(s.ownership_token)) return { ok: false, reason: 'ownership' }
   let answered = false
   for (const scheme of ['https', 'http']) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
     try {
-      const r = await timedFetch(`${scheme}://${host}/`, { redirect: 'manual' })
+      const r = await fetch(`${scheme}://${host}/.well-known/tongkrongan-verification.txt`, { redirect: 'manual', signal: controller.signal })
       answered = true
-      if (r.status >= 200 && r.status < 300) return { ok: true }
-    } catch { /* coba skema berikutnya */ }
+      if (r.status !== 200 || !r.body) { await r.body?.cancel(); continue }
+      const reader = r.body.getReader()
+      let content = ''
+      let bytes = 0
+      const decoder = new TextDecoder()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          bytes += value.byteLength
+          if (bytes > 256) break
+          content += decoder.decode(value, { stream: true })
+        }
+      } finally { await reader.cancel() }
+      content += decoder.decode()
+      if (bytes <= 256 && content.trim() === s.ownership_token) return { ok: true }
+    } catch { /* coba skema berikutnya */ } finally { clearTimeout(timeout) }
   }
-  return { ok: false, reason: answered ? 'platform' : 'http' }
+  return { ok: false, reason: answered ? 'ownership' : 'http' }
 }
 
 export async function healthCheck(env: Env, name: string): Promise<boolean> {

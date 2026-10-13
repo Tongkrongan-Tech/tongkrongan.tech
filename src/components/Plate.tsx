@@ -19,10 +19,10 @@ export function Plate({ name, stamp, children, size = 'lg', className = '' }: { 
     <div className={`plate px-5 pb-5 pt-6 sm:px-7 sm:pb-6 sm:pt-7 ${className}`}>
       {['left-2 top-2', 'right-2 top-2', 'left-2 bottom-2', 'right-2 bottom-2'].map((p) => <span key={p} className={`screw ${p}`} />)}
       <p className="text-xs font-semibold" style={{ color: 'var(--board-dim)' }}>{t('plate.label')}</p>
-      <div className="mt-2" style={{ containerType: 'inline-size' }} aria-label={`${shown || t('name.placeholder')}.${domain}`} role="text">
+      <div className="mt-2" style={{ containerType: 'inline-size' }} aria-label={`${shown || t('name.placeholder')}.${domain}`} role="img">
         <p className="m-0 flex items-center break-all font-extrabold leading-[1.4] tracking-tight" style={{ fontSize: nameSize, minHeight: `calc(2.8 * ${base})` }} aria-hidden="true">
           <span>
-            {shown ? [...shown].map((ch, i) => <span key={`${i}-${ch}`} className="tile tile-new">{ch}</span>) : <span style={{ color: 'var(--board-dim)', opacity: 0.55 }}>{t('name.placeholder')}</span>}
+            {shown ? [...shown].map((ch, i) => <span key={`${i}-${ch}`} className="tile tile-new">{ch}</span>) : <span style={{ color: 'var(--board-dim)' }}>{t('name.placeholder')}</span>}
           </span>
         </p>
         <p className="m-0 mt-1 whitespace-nowrap font-extrabold leading-[1.2] tracking-tight" style={{ fontSize: domSize, color: 'var(--board-dim)' }} aria-hidden="true">.{domain}</p>

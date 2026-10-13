@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import type { Status } from '../lib/store'
@@ -27,6 +27,18 @@ export const Icon = {
 
 export function Spinner({ size = 18 }: { size?: number }) {
   return (<svg className="spin" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="square"><path d="M12 3a9 9 0 1 0 9 9" /></svg>)
+}
+
+export function radioKeys(e: KeyboardEvent<HTMLElement>) {
+  const options = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)'))
+  const current = options.indexOf(e.target as HTMLButtonElement)
+  if (current < 0) return
+  const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]
+  if (!delta && e.key !== 'Home' && e.key !== 'End') return
+  e.preventDefault()
+  const next = options[e.key === 'Home' ? 0 : e.key === 'End' ? options.length - 1 : (current + delta! + options.length) % options.length]
+  next.click()
+  next.focus()
 }
 
 /* Muncul saat masuk layar: hanya bergeser dan memudar, tanpa blur. */
@@ -84,36 +96,21 @@ export function StatusBadge({ status }: { status: Status }) {
 }
 
 export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
-    if (!open) return
-    const prev = document.activeElement as HTMLElement | null
-    ref.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'Tab' && ref.current) {
-        const f = ref.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
-        if (!f.length) return
-        const first = f[0], last = f[f.length - 1]
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
-      }
-    }
-    document.addEventListener('keydown', onKey)
+    const dialog = ref.current!
+    if (!open) { dialog.close(); return }
+    dialog.showModal()
+    dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+    const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; prev?.focus() }
-  }, [open, onClose])
+    return () => { dialog.close(); document.body.style.overflow = overflow }
+  }, [open])
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div className="fixed inset-0 z-[80] grid place-items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <div className="absolute inset-0" style={{ background: 'color-mix(in srgb, var(--ink) 60%, transparent)' }} onClick={onClose} />
-          <motion.div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="card relative w-full max-w-md p-6" style={{ borderColor: 'var(--ink)', borderWidth: 2, boxShadow: '6px 6px 0 var(--sh)' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ duration: 0.2 }}>
-            {children}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <dialog ref={ref} aria-label={title} className="card fixed inset-0 m-auto max-h-[90svh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto p-6 backdrop:bg-[var(--ink)] backdrop:opacity-60" style={{ color: 'var(--ink)', borderColor: 'var(--ink)', borderWidth: 2, boxShadow: '6px 6px 0 var(--sh)' }}
+      onCancel={(e) => { e.preventDefault(); onClose() }} onClick={(e) => { if (e.target === e.currentTarget) { const r = e.currentTarget.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose() } }}>
+      {children}
+    </dialog>
   )
 }
 

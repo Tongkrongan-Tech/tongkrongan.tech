@@ -36,7 +36,7 @@ const SECURITY_TXT = [
 
 type OAuthProvider = 'github' | 'google' | 'discord'
 type User = { id: string; email: string; provider: string }
-type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; fail_reason: string | null; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
+type SubRow = { name: string; user_id: string; platform: string; type: RecordType; value: string; status: string; ownership_token: string | null; fail_reason: string | null; vercel_project?: string | null; cf_record_id: string | null; txt_label: string | null; txt_value: string | null; txt_record_id: string | null; last_check_at: number; created_at: number; activated_at: number | null }
 
 const quota = (env: Env) => Number(env.QUOTA) || 3
 // Verifikasi email aktif hanya bila diminta DAN email benar-benar bisa dikirim (RESEND_API_KEY + EMAIL_FROM).
@@ -113,6 +113,7 @@ async function presentSub(env: Env, s: SubRow) {
   ])
   return {
     name: s.name, platform: s.platform, type: s.type, value: s.value, status: s.status, failReason: s.fail_reason ?? undefined,
+    ownershipToken: s.ownership_token ?? undefined,
     txtLabel: s.txt_label ?? undefined, txtValue: s.txt_value ?? undefined, createdAt: s.created_at, owned: !!s.activated_at, rated: !!rated,
     history: h.results.map((x) => ({ at: x.at, key: x.key, detail: x.detail ?? undefined })),
     checks: c.results.map((x) => !!x.ok).reverse(),
@@ -178,8 +179,8 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
     if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
     try {
-      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, txt_label, txt_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', b.txtLabel, b.txtValue, Date.now()).run()
+      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, txt_label, txt_value, created_at, ownership_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', b.txtLabel, b.txtValue, Date.now(), randomHex(32)).run()
     } catch { throw new HttpError(409, 'taken') }
     try {
       const rid = await createRecord(env, hostOf(env, b.name), b.type, b.value)
@@ -474,8 +475,8 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
         else tid = await updateRecord(env, s.txt_record_id, txtHost(env, b.txtLabel, s.name), 'TXT', b.txtValue)
       } else await deleteRecord(env, s.txt_record_id)
     } catch (e) { console.error('updateRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
-    await env.DB.prepare("UPDATE subdomains SET platform = ?, type = ?, value = ?, cf_record_id = ?, txt_label = ?, txt_value = ?, txt_record_id = ?, status = 'pending', fail_reason = NULL, last_check_at = 0 WHERE name = ?")
-      .bind(b.platform, b.type, b.value, rid, b.txtLabel, b.txtValue, tid, s.name).run()
+    await env.DB.prepare("UPDATE subdomains SET platform = ?, type = ?, value = ?, cf_record_id = ?, txt_label = ?, txt_value = ?, txt_record_id = ?, ownership_token = ?, status = 'pending', fail_reason = NULL, last_check_at = 0 WHERE name = ?")
+      .bind(b.platform, b.type, b.value, rid, b.txtLabel, b.txtValue, tid, randomHex(32), s.name).run()
     await historyAdd(env, s.name, 'h.edited', `${b.type} ${b.value}`)
     return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
   },
@@ -509,13 +510,14 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     }
     const r = await verifyRecord(env, s)
     if (r.ok) {
-      await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(Date.now(), s.name).run()
+      const activated = await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ? AND ownership_token = ? AND status != 'suspended'").bind(Date.now(), s.name, s.ownership_token).run()
+      if (!activated.meta.changes) return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
       await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, 1, ?)').bind(s.name, Date.now()).run()
       await historyAdd(env, s.name, 'h.active')
       if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform, u.email)
     } else {
-      await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = ? WHERE name = ?").bind(r.reason, s.name).run()
-      await historyAdd(env, s.name, 'h.failed', r.reason)
+      const failed = await env.DB.prepare("UPDATE subdomains SET status = 'failed', fail_reason = ? WHERE name = ? AND ownership_token = ? AND status != 'suspended'").bind(r.reason, s.name, s.ownership_token).run()
+      if (failed.meta.changes) await historyAdd(env, s.name, 'h.failed', r.reason)
     }
     return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
   },

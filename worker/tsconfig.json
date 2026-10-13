@@ -9,6 +9,7 @@
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["./*.ts", "../src/lib/names.ts", "../src/lib/dns.ts"]

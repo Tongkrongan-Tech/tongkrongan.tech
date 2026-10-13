@@ -10,6 +10,7 @@ export interface Sub {
   value: string
   status: Status
   failReason?: string
+  ownershipToken?: string
   txtLabel?: string
   txtValue?: string
   createdAt: number

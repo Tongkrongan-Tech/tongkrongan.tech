@@ -99,6 +99,7 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 
 ## Aturan untuk agent berikutnya
 
+- Instruksi pemilik (2026-10-13): setiap selesai memperbaiki issue, kirim ringkasan hasil dan pengujian ke webhook Discord dari `DISCORD_WEBHOOK_URL` di `.dev.vars`. Jangan cantumkan URL rahasia di kode, log, atau commit. Sebutkan dengan jelas bila perubahan baru diuji lokal dan belum deploy.
 - Semua warna lewat token CSS (`var(--...)`), jangan hex di komponen (kecuali teks `#1b1612` di atas kartu platform pastel).
 - Setiap teks baru masuk `dict.ts` dengan dua bahasa. Dilarang tanda pisah panjang (em dash) di teks UI.
 - Tiap kontrol harus punya perilaku nyata atau dihapus; navbar hanya memuat halaman yang ada.
@@ -111,6 +112,18 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 - Jangan ubah font dari Poppins.
 
 ## Log Perubahan
+
+### 2026-10-13, audit aksesibilitas dan performa, issue #39
+- Perbaikan judul animasi, nama aksesibel kontrol, kontras tab/placeholder papan, keyboard radio, fokus wizard, pemilih tema, dan dialog native. Main mencadangkan tinggi viewport; font utama di-preload.
+- Build, tes, kontras, dan browser lulus. Lighthouse accessibility 100 di lima halaman; axe 30 kombinasi halaman/tema ditambah dialog mobile bersih. Skrip audit opsional dan [hasil lengkap](AUDIT-2026-10-13.md) disimpan.
+- Issue belum ditutup: LCP akhir 2,528–3,231 detik masih melewati target 2,5 detik; VoiceOver/NVDA dan produksi belum diuji. Perubahan belum deploy.
+
+### 2026-10-13, bukti kendali situs, issue #4
+- DNS cocok dan HTTP 2xx tidak lagi cukup. Verifikasi manual dan Cron wajib mendapatkan HTTP 200 dengan isi token 256-bit yang persis cocok dari `/.well-known/tongkrongan-verification.txt`. Redirect ditolak, pembacaan dibatasi 256 byte dan 8 detik per skema; token tidak dikirim dalam request.
+- Migrasi `0008_ownership_token.sql` memberi token unik pada klaim lama. Klaim baru memakai token acak baru, edit record merotasi token. Klaim aktif lama tetap aktif; token baru wajib pada verifikasi berikutnya. Petunjuk ID/EN tersedia di Claim dan Dashboard, termasuk Vercel.
+- Penulisan hasil verifikasi dicocokkan dengan token terkini dan status penangguhan supaya hasil HTTP lama tidak mengaktifkan tujuan yang sudah berubah. SQL API/Cron diuji dengan SQLite bawaan Node (flag `--experimental-sqlite` pada `npm test`, tanpa dependensi baru).
+- Pengujian: tes regresi server wildcard, token salah, HTML, respons besar, redirect, token kosong, DNS salah; seluruh `npm test` dan build lulus. Migrasi lokal lulus. Browser/API lokal lulus untuk pembuatan, rotasi, petunjuk kedua halaman; axe tidak menemukan pelanggaran pada panel bukti. DNS lokal memakai mock, sementara tes unit menjalankan cabang live dengan fetch terkontrol.
+- Belum deploy atau migrasi database produksi. Terapkan migrasi sebelum deploy Worker. Ini menggantikan keputusan lama "tanpa berkas" pada tabel historis di atas.
 
 ### 2026-10-05, build awal (agent: Claude Sonnet 5.5)
 - Membaca PRD; memuat skill: using-superpowers, ui-ux-pro-max (hasil generator brutalism/mono **ditolak**, tidak cocok dengan Poppins dan PRD; hanya aturan UX dipakai), antislop (filter + Delivery Gate), karpathy-guidelines.

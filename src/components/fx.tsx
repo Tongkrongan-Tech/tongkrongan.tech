@@ -45,7 +45,8 @@ export function Words({ text, className = '', delay = 0 }: { text: string; class
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, margin: '0px 0px -10% 0px' })
   return (
-    <span ref={ref} className={className} aria-label={text}>
+    <span ref={ref} className={className}>
+      <span className="sr-only">{text}</span>
       {text.split(' ').map((w, i) => (
         <span key={i} aria-hidden="true" className="mr-[0.25em] inline-block overflow-hidden pb-[0.12em] align-bottom">
           <motion.span className="inline-block" initial={reduce ? false : { y: '110%' }} animate={inView ? { y: 0 } : {}} transition={{ duration: 0.6, delay: delay + i * 0.06, ease: [0.22, 1, 0.36, 1] }}>{w}</motion.span>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { api, ApiError } from '../lib/api'
 import { usePrefs } from '../lib/prefs'
-import { Icon, Spinner } from '../components/ui'
+import { Icon, Spinner, radioKeys } from '../components/ui'
 import { Burst, Mark, Words } from '../components/fx'
 import { Turnstile } from '../components/Turnstile'
 import { NAME_RE } from '../lib/names'
@@ -69,9 +69,9 @@ export function Report() {
         </div>
         <fieldset className="m-0 border-0 p-0">
           <legend className="label">{t('report.reason')}</legend>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-describedby="rr-e">
-            {REPORT_REASONS.map((r) => (
-              <button key={r} type="button" role="radio" aria-checked={reason === r} onClick={() => setReason(r)} className="chip" style={{ borderColor: reason === r ? 'var(--ink)' : undefined, background: reason === r ? 'var(--hl)' : undefined, color: reason === r ? 'var(--hl-ink)' : undefined }}>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('report.reason')} aria-describedby="rr-e" onKeyDown={radioKeys}>
+            {REPORT_REASONS.map((r, i) => (
+              <button key={r} type="button" role="radio" aria-checked={reason === r} tabIndex={reason === r || (!reason && i === 0) ? 0 : -1} onClick={() => setReason(r)} className="chip" style={{ borderColor: reason === r ? 'var(--ink)' : undefined, background: reason === r ? 'var(--hl)' : undefined, color: reason === r ? 'var(--hl-ink)' : undefined }}>
                 {reason === r && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}><Icon.check size={14} /></motion.span>}{t(`report.r.${r}`)}
               </button>
             ))}

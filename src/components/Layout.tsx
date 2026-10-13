@@ -62,8 +62,9 @@ function Settings({ inline = false }: { inline?: boolean }) {
     if (!d) return
     e.preventDefault()
     const next = THEMES[(THEMES.indexOf(resolved) + d + THEMES.length) % THEMES.length]
+    const group = e.currentTarget
     setTheme(next)
-    requestAnimationFrame(() => e.currentTarget.querySelector<HTMLElement>(`[data-theme-opt="${next}"]`)?.focus())
+    requestAnimationFrame(() => group.querySelector<HTMLElement>(`[data-theme-opt="${next}"]`)?.focus())
   }
 
   const head = 'px-1 pb-1.5 pt-1 text-xs font-extrabold'
@@ -94,7 +95,7 @@ function Settings({ inline = false }: { inline?: boolean }) {
   if (inline) return <div className="card p-3">{panel}</div>
   return (
     <div ref={ref} className="relative">
-      <button type="button" className="btn btn-outline btn-sm gap-2" aria-haspopup="true" aria-expanded={open} aria-label={`${t('theme.label')}, ${t('lang.label')}`} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="btn btn-outline btn-sm gap-2" aria-haspopup="true" aria-expanded={open} aria-label={`${lang.toUpperCase()}, ${t('theme.label')}, ${t('lang.label')}`} onClick={() => setOpen((o) => !o)}>
         <Swatch id={resolved} size={14} />
         <span className="text-xs font-extrabold uppercase" aria-hidden="true">{lang}</span>
       </button>
@@ -205,7 +206,7 @@ export function Layout() {
 
       {configError && <p role="alert" className="fixed inset-x-0 top-[4.5rem] z-40 mx-auto w-fit max-w-[92vw] rounded-md border-2 px-4 py-2 text-center text-sm font-bold" style={{ background: 'var(--surface)', borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t('config.error')}</p>}
 
-      <main id="main" ref={mainRef} className="relative flex-1 pt-16 outline-none" tabIndex={-1}>
+      <main id="main" ref={mainRef} className="relative min-h-svh flex-1 pt-16 outline-none" tabIndex={-1}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={loc.pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
             <Suspense fallback={<div className="grid min-h-[60vh] place-items-center" style={{ color: 'var(--accent-text)' }} role="status" aria-label={t('ui.loading')}><Spinner size={34} /></div>}>

@@ -1,5 +1,10 @@
 // [Bahasa Indonesia, English]. Tanpa tanda pisah panjang, tanpa istilah pemasaran kosong.
 export const dict: Record<string, [string, string]> = {
+  'claim.proof.h': ['Buktikan kendali atas situs', 'Prove control of your site'],
+  'claim.proof.d': ['Buat berkas .well-known/tongkrongan-verification.txt di folder publik situsmu, isi dengan token di bawah, lalu deploy. Alamat ini harus menyajikan teks token saja tanpa redirect. Setelah mengubah record DNS, gunakan token baru lalu verifikasi lagi.', 'Create .well-known/tongkrongan-verification.txt in your site’s public folder, fill it with the token below, then deploy. This address must serve only the token text without redirects. After editing DNS records, use the new token and verify again.'],
+  'claim.proof.content': ['Isi berkas', 'File contents'],
+  'claim.proof.copy': ['Salin token bukti kepemilikan', 'Copy ownership proof token'],
+  'val.ownership': ['Berkas bukti kepemilikan belum cocok. Terbitkan token terbaru di /.well-known/tongkrongan-verification.txt pada situsmu, lalu verifikasi lagi.', 'Ownership proof does not match yet. Publish the latest token at /.well-known/tongkrongan-verification.txt on your site, then verify again.'],
   // umum
   'ui.copy': ['Salin', 'Copy'],
   'ui.copied': ['Tersalin', 'Copied'],
@@ -320,7 +325,7 @@ export const dict: Record<string, [string, string]> = {
   'captcha.retry': ['Coba muat lagi', 'Try again'],
   'reset.notoken': ['Tautan reset tidak lengkap. Buka tautan dari email persis seperti yang dikirim, atau minta tautan baru.', 'The reset link is incomplete. Open the link from your email exactly as sent, or request a new one.'],
   'reset.notoken.link': ['Minta tautan reset baru', 'Request a new reset link'],
-  'login.show': ['Tampilkan kata sandi', 'Show password'],
+  'login.show': ['Lihat kata sandi', 'Show password'],
   'login.hide': ['Sembunyikan kata sandi', 'Hide password'],
   'login.forgot': ['Lupa kata sandi?', 'Forgot password?'],
   'login.forgot.h': ['Atur ulang kata sandi', 'Reset your password'],

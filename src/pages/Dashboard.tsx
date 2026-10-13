@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
 import { useStore, type Sub } from '../lib/store'
 import { platformById, validateValue, type RecordType } from '../lib/dns'
-import { CopyButton, Dialog, Icon, Sparkline, Spinner, StatusBadge } from '../components/ui'
+import { CopyButton, Dialog, Icon, Sparkline, Spinner, StatusBadge, radioKeys } from '../components/ui'
 import { Count } from '../components/fx'
 import { Csat } from '../components/Csat'
+import { OwnershipProof } from '../components/OwnershipProof'
 
 function EditDialog({ sub, onClose, onError }: { sub: Sub | null; onClose: () => void; onError: (m: string) => void }) {
   const { t, te, domain } = usePrefs()
@@ -32,8 +33,8 @@ function EditDialog({ sub, onClose, onError }: { sub: Sub | null; onClose: () =>
     <Dialog open={!!sub} onClose={onClose} title={t('dash.edit')}>
       <h2 className="text-xl">{t('dash.edit')}: <span className="mark">{sub?.name}</span></h2>
       <div className="mt-4 grid gap-4">
-        <div role="radiogroup" aria-label={t('claim.type')} className="flex flex-wrap gap-2">
-          {p?.types.map((ty) => (<button key={ty} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)} className="btn btn-sm mono" style={{ background: type === ty ? 'var(--hl)' : 'var(--surface)', color: type === ty ? 'var(--hl-ink)' : 'var(--ink)' }}>{ty}</button>))}
+        <div role="radiogroup" aria-label={t('claim.type')} className="flex flex-wrap gap-2" onKeyDown={radioKeys}>
+          {p?.types.map((ty) => (<button key={ty} type="button" role="radio" aria-checked={type === ty} tabIndex={type === ty ? 0 : -1} onClick={() => setType(ty)} className="btn btn-sm mono" style={{ background: type === ty ? 'var(--hl)' : 'var(--surface)', color: type === ty ? 'var(--hl-ink)' : 'var(--ink)' }}>{ty}</button>))}
         </div>
         <div>
           <label htmlFor="ev" className="label">{t('claim.value')}</label>
@@ -177,6 +178,7 @@ export function Dashboard() {
                     </p>
                     {(s.status === 'failed' || s.status === 'suspended') && s.failReason && <p role="alert" className="mt-3 rounded-lg border-2 p-3 text-sm font-medium" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t(`val.${s.failReason}`, { host: `${s.name}.${domain}`, p: platformById(s.platform).name })}</p>}
                     {s.status === 'active' && !s.rated && Date.now() - s.createdAt < 14 * 86_400_000 && <Csat name={s.name} />}
+                    <OwnershipProof sub={s} />
                     <div className="mt-4"><p className="mb-1 text-xs font-bold" style={{ color: 'var(--muted)' }}>{t('dash.uptime')}</p><Sparkline data={s.checks} label={t('dash.uptimeEmpty')} /></div>
                     <div className="mt-5 flex flex-wrap gap-2">
                       <CopyButton text={`https://${address}`} label={`${t('ui.copy')} ${address}`} />

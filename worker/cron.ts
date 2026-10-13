@@ -6,7 +6,7 @@ import { notifyClaimActive } from './notify'
 import { getConnection, verifyProjectDomain } from './vercel'
 import type { RecordType } from '../src/lib/dns'
 
-type Row = { name: string; user_id: string; platform: string; vercel_project: string | null; type: RecordType; value: string; cf_record_id: string | null; txt_record_id: string | null; status: string; created_at: number; activated_at: number | null }
+type Row = { name: string; user_id: string; platform: string; vercel_project: string | null; type: RecordType; value: string; ownership_token: string | null; cf_record_id: string | null; txt_record_id: string | null; status: string; created_at: number; activated_at: number | null }
 const DAY = 864e5
 
 async function hist(env: Env, name: string, key: string, detail?: string) {
@@ -48,7 +48,8 @@ export async function runCron(env: Env) {
     const r = await verifyRecord(env, s)
     await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ?').bind(now, s.name).run()
     if (r.ok) {
-      await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ?").bind(now, s.name).run()
+      const activated = await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ? AND ownership_token = ? AND status IN ('pending','failed')").bind(now, s.name, s.ownership_token).run()
+      if (!activated.meta.changes) continue
       await hist(env, s.name, 'h.active')
       if (!s.activated_at) await notifyClaimActive(env, s.name, s.platform)
     }

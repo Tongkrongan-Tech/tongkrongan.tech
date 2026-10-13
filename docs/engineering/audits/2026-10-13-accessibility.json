@@ -1,0 +1,161 @@
+{
+  "audits": [
+    {
+      "theme": "light",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "theme": "kopi",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "kopi",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "kopi",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "kopi",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "kopi",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "theme": "mint",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "mint",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "mint",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "mint",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "mint",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "theme": "grape",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "grape",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "grape",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "grape",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "grape",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "theme": "ocean",
+      "path": "/",
+      "violations": []
+    },
+    {
+      "theme": "ocean",
+      "path": "/claim",
+      "violations": []
+    },
+    {
+      "theme": "ocean",
+      "path": "/dashboard",
+      "violations": []
+    },
+    {
+      "theme": "ocean",
+      "path": "/login",
+      "violations": []
+    },
+    {
+      "theme": "ocean",
+      "path": "/report",
+      "violations": []
+    },
+    {
+      "path": "dialog mobile",
+      "violations": []
+    }
+  ],
+  "errors": [],
+  "keyboard": "PASS: dialog focus/Escape, theme arrows, report arrows",
+  "responsive": "PASS: 360x800, 844x390"
+}

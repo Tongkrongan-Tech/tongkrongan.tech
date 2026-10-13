@@ -68,7 +68,7 @@ export function Steps() {
         return (
           <button key={n} role="tab" id={`demo-tab-${n}`} aria-selected={on} aria-controls="demo-panel" tabIndex={on ? 0 : -1} type="button" onClick={() => pick(n)}
             onKeyDown={(e) => { const d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? 2 : 0; if (d) { e.preventDefault(); pick((n + d) % 3); document.getElementById(`demo-tab-${(n + d) % 3}`)?.focus() } }}
-            className="cursor-pointer border-0 bg-transparent py-3 text-left" style={{ color: 'var(--ink)', opacity: on ? 1 : 0.55, transition: 'opacity .25s' }}>
+            className="cursor-pointer border-0 bg-transparent py-3 text-left" style={{ color: 'var(--ink)' }}>
             <span className="sr-only">{t('demo.step', { n: n + 1 })}: </span>
             <span className="block text-xl font-extrabold tracking-tight">{t(`demo.s${n + 1}.t`)}</span>
             <span className="mt-0.5 block text-sm" style={{ color: 'var(--muted)' }}>{t(`demo.s${n + 1}.d`)}</span>
