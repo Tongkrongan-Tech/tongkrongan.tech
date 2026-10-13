@@ -11,7 +11,7 @@ import { ScrollBar } from './fx'
 export function Logo({ className = 'h-6 sm:h-7' }: { className?: string }) {
   return (
     <Link to="/" className="inline-flex items-center no-underline" aria-label="Tongkrongan.tech">
-      <img src="/logo-wordmark.png" alt="Tongkrongan.tech" width="640" height="77" className={`logo-art w-auto ${className}`} />
+      <img src="/logo-wordmark.webp" alt="Tongkrongan.tech" width="466" height="56" className={`logo-art w-auto ${className}`} />
     </Link>
   )
 }
@@ -227,7 +227,7 @@ function Footer() {
     <footer className="border-t-[1.5px]" style={{ borderColor: 'var(--ink)', background: 'var(--surface-2)' }}>
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.3fr_1fr]">
         <div>
-          <img src="/logo-full.png" alt="Tongkrongan.tech" width="720" height="428" loading="lazy" className="logo-art h-auto w-28" />
+          <img src="/logo-full.webp" alt="Tongkrongan.tech" width="224" height="133" loading="lazy" className="logo-art h-auto w-28" />
           <p className="mt-4 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{t('footer.about')}</p>
           <ul className="mt-5 grid gap-1.5 text-sm font-semibold">
             {['footer.p1', 'footer.p2', 'footer.p3'].map((k) => <li key={k} className="flex items-start gap-2"><span style={{ color: 'var(--ok)' }}><Icon.check size={16} /></span>{t(k)}</li>)}
