@@ -117,7 +117,7 @@ export function Layout() {
   const [menu, setMenu] = useState(false)
   const loc = useLocation()
   const mainRef = useRef<HTMLElement>(null)
-  const firstRoute = useRef(true)
+  const prevPath = useRef(loc.pathname)
   useRouteSeo()
 
   useEffect(() => { setMenu(false) }, [loc.pathname])
@@ -130,7 +130,8 @@ export function Layout() {
   }, [loc.pathname, loc.hash])
   // Pindah halaman: fokus ke <main> agar pembaca layar tahu konten berganti. Lewati muatan pertama dan jangan rebut fokus dari kolom yang sedang diisi.
   useEffect(() => {
-    if (firstRoute.current) { firstRoute.current = false; return }
+    if (prevPath.current === loc.pathname) return
+    prevPath.current = loc.pathname
     if (loc.hash) return
     const a = document.activeElement
     if (a instanceof HTMLElement && a !== document.body && a.closest('input, textarea, select, [contenteditable="true"]')) return
