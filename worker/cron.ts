@@ -108,6 +108,9 @@ export async function runCron(env: Env) {
     }
   }
 
+  // 5b. Event funnel anonim disimpan 90 hari saja.
+  await env.DB.prepare('DELETE FROM funnel_events WHERE at < ?').bind(Date.now() - 90 * 86_400_000).run()
+
   // 6. Tandai nama yang menyerupai merek atau tokoh untuk review manusia (tidak ditolak otomatis).
   const reviewCandidates = await env.DB.prepare("SELECT name FROM subdomains WHERE status IN ('active','pending','failed') LIMIT 200").all<{ name: string }>()
   for (const { name } of reviewCandidates.results) {

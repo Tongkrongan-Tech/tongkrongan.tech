@@ -3,7 +3,7 @@ import type { Lang } from './prefs'
 /* Isi Syarat Layanan dan Kebijakan Privasi. Setiap klaim di sini harus sesuai perilaku aplikasi yang sebenarnya
    (worker/, migrations/). Ubah teks ini bersamaan dengan perubahan perilaku, lalu perbarui LEGAL_UPDATED. */
 
-export const LEGAL_UPDATED = '2026-10-11'
+export const LEGAL_UPDATED = '2026-10-13'
 // Isi bila sudah ada alamat kontak resmi (mis. lewat Email Routing). Kosong = halaman menampilkan keterangan pengganti.
 export const CONTACT_EMAIL = ''
 
@@ -111,6 +111,8 @@ const privacyId: Doc = {
       'Laporan penyalahgunaan: nama subdomain, alasan, keterangan opsional (maksimal 600 karakter), dan sidik IP yang di-hash sebagian, bukan IP asli.',
       'Batas laju: untuk mencegah penyalahgunaan, alamat IP atau email dipakai sebagai kunci penghitung sementara di database. Hitungan lama dihapus otomatis dalam hitungan jam.',
       'Hubungan Vercel (opsional): bila kamu menghubungkan Vercel, token aksesnya disimpan terenkripsi (AES-GCM) dan bisa kamu putus kapan saja.',
+      'Statistik klaim anonim: nama langkah di wizard klaim (mulai, pilih platform, isi record, verifikasi) beserta id acak per tab dan waktunya, tanpa akun, email, atau IP. Tidak dikirim bila peramban mengirim sinyal Do Not Track. Dihapus setelah 90 hari.',
+      'Survei kepuasan (opsional): skor 1 sampai 5 untuk satu subdomain, tanpa data pribadi.',
     ] },
     { h: 'Yang tidak kami lakukan', ul: [
       'Tidak ada iklan, pelacak iklan, atau analitik pihak ketiga di situs ini.',
@@ -143,7 +145,7 @@ const privacyId: Doc = {
       'Subdomain yang belum pernah aktif dalam 24 jam dihapus otomatis.',
       'Laporan penyalahgunaan disimpan selama dibutuhkan untuk menjaga keamanan layanan.',
     ] },
-    { h: 'Hakmu', p: ['Kamu bisa melihat dan menghapus subdomainmu sendiri di dasbor, dan memutus hubungan Vercel kapan saja. Kamu juga berhak meminta akses, koreksi, atau penghapusan akun dan datamu. Saat ini penghapusan akun dilakukan atas permintaan lewat kontak di bawah; fitur hapus akun mandiri belum tersedia. Kami berupaya memperlakukan data pribadi sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi.'] },
+    { h: 'Hakmu', p: ['Kamu bisa melihat dan menghapus subdomainmu sendiri di dasbor, dan memutus hubungan Vercel kapan saja. Kamu juga berhak meminta akses, koreksi, atau penghapusan akun dan datamu. Kamu bisa mengganti kata sandi dan menghapus akunmu sendiri di halaman Pengaturan akun; menghapus akun melepas semua subdomainmu dan menghapus data akun. Kami berupaya memperlakukan data pribadi sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi.'] },
     { h: 'Keamanan', p: ['Kata sandi di-hash, token sesi dan kode disimpan sebagai hash, token Vercel dienkripsi, semua lalu lintas memakai HTTPS, dan ada batas laju serta CAPTCHA. Tidak ada sistem yang sepenuhnya aman. Bila terjadi kebocoran yang berdampak padamu, kami berkomitmen memberi tahu.'] },
     { h: 'Perubahan kebijakan', p: ['Untuk perubahan besar kami memberi tahu paling lambat 30 hari sebelum berlaku, lewat situs ini atau email. Tanggal pembaruan tertera di atas.'] },
   ],
@@ -161,6 +163,8 @@ const privacyEn: Doc = {
       'Abuse reports: the subdomain name, reason, an optional note (up to 600 characters), and a truncated hash of the IP address, not the IP itself.',
       'Rate limiting: to prevent abuse, an IP address or email is used as the key of a temporary counter in the database. Old counters are deleted automatically within hours.',
       'Vercel connection (optional): if you connect Vercel, its access token is stored encrypted (AES-GCM) and you can disconnect at any time.',
+      'Anonymous claim stats: the step names in the claim wizard (start, pick platform, fill record, verify) with a random per-tab id and the time, without account, email, or IP. Not sent when your browser sends Do Not Track. Deleted after 90 days.',
+      'Satisfaction survey (optional): a 1 to 5 score for one subdomain, without personal data.',
     ] },
     { h: 'What we do not do', ul: [
       'There are no ads, ad trackers, or third-party analytics on this site.',
@@ -193,7 +197,7 @@ const privacyEn: Doc = {
       'A subdomain that has never become active within 24 hours is deleted automatically.',
       'Abuse reports are kept for as long as needed to keep the service safe.',
     ] },
-    { h: 'Your rights', p: ['You can view and delete your own subdomains from the dashboard, and disconnect Vercel at any time. You may also ask for access, correction, or deletion of your account and data. For now account deletion is handled on request through the contact below; a self-service delete account feature is not available yet. We aim to handle personal data in line with Indonesian Law No. 27 of 2022 on Personal Data Protection.'] },
+    { h: 'Your rights', p: ['You can view and delete your own subdomains from the dashboard, and disconnect Vercel at any time. You may also ask for access, correction, or deletion of your account and data. You can change your password and delete your account yourself on the Account settings page; deleting your account releases all your subdomains and removes your account data. We aim to handle personal data in line with Indonesian Law No. 27 of 2022 on Personal Data Protection.'] },
     { h: 'Security', p: ['Passwords are hashed, session tokens and codes are stored as hashes, Vercel tokens are encrypted, all traffic uses HTTPS, and there are rate limits and CAPTCHA. No system is completely secure. If a breach affects you, we commit to telling you.'] },
     { h: 'Changes to this policy', p: ['For major changes we give at least 30 days notice before they take effect, on this site or by email. The update date is shown above.'] },
   ],

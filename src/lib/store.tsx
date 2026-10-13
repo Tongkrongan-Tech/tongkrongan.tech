@@ -14,6 +14,7 @@ export interface Sub {
   txtValue?: string
   createdAt: number
   owned: boolean
+  rated?: boolean
   history: { at: number; key: string; detail?: string }[]
   checks: boolean[]
 }

@@ -1,6 +1,7 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
 import { classifyName } from '../src/lib/reserved'
 import { REPORT_REASONS } from '../src/lib/report'
+import { FUNNEL_EVENTS, summarizeFunnel } from '../src/lib/funnel'
 import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
@@ -105,13 +106,14 @@ async function historyAdd(env: Env, name: string, key: string, detail?: string) 
 }
 
 async function presentSub(env: Env, s: SubRow) {
-  const [h, c] = await Promise.all([
+  const [h, c, rated] = await Promise.all([
     env.DB.prepare('SELECT key, detail, at FROM history WHERE name = ? ORDER BY at DESC, id DESC LIMIT 30').bind(s.name).all<{ key: string; detail: string | null; at: number }>(),
     env.DB.prepare('SELECT ok FROM checks WHERE name = ? ORDER BY at DESC, id DESC LIMIT 14').bind(s.name).all<{ ok: number }>(),
+    env.DB.prepare('SELECT 1 AS x FROM csat WHERE name = ? AND sub_created = ?').bind(s.name, s.created_at).first(),
   ])
   return {
     name: s.name, platform: s.platform, type: s.type, value: s.value, status: s.status, failReason: s.fail_reason ?? undefined,
-    txtLabel: s.txt_label ?? undefined, txtValue: s.txt_value ?? undefined, createdAt: s.created_at, owned: !!s.activated_at,
+    txtLabel: s.txt_label ?? undefined, txtValue: s.txt_value ?? undefined, createdAt: s.created_at, owned: !!s.activated_at, rated: !!rated,
     history: h.results.map((x) => ({ at: x.at, key: x.key, detail: x.detail ?? undefined })),
     checks: c.results.map((x) => !!x.ok).reverse(),
   }
@@ -563,6 +565,27 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     return clearSessionCookies(req, { ok: true })
   },
 
+  // Event funnel anonim (PRD: waktu sampai aktif dan tingkat keberhasilan klaim). Hanya nama event dari daftar putih dan id sesi acak.
+  'POST /api/events': async (req, env) => {
+    if (!(await rateLimit(env, `evt:${clientIp(req)}`, 120, 3600))) throw new HttpError(429, 'rate_limited')
+    const b = await readBody<{ ev?: string; sid?: string }>(req)
+    if (!(FUNNEL_EVENTS as readonly string[]).includes(String(b.ev)) || !/^[a-f0-9]{16,32}$/.test(String(b.sid))) throw new HttpError(422, 'bad_input')
+    await env.DB.prepare('INSERT INTO funnel_events (sid, ev, at) VALUES (?, ?, ?)').bind(b.sid, b.ev, Date.now()).run()
+    return json({ ok: true })
+  },
+
+  // Survei singkat setelah subdomain aktif: skor 1-5, satu jawaban per subdomain, tanpa data pribadi.
+  'POST /api/csat': async (req, env) => {
+    const u = await requireUser(req, env)
+    const b = await readBody<{ name?: string; score?: number }>(req)
+    const score = Number(b.score)
+    if (!Number.isInteger(score) || score < 1 || score > 5) throw new HttpError(422, 'bad_input')
+    const s = await ownedSub(env, u, String(b.name ?? ''))
+    if (s.status !== 'active') throw new HttpError(422, 'bad_input')
+    await env.DB.prepare('INSERT OR IGNORE INTO csat (name, sub_created, score, at) VALUES (?, ?, ?, ?)').bind(s.name, s.created_at, score, Date.now()).run()
+    return json({ ok: true })
+  },
+
   'POST /api/reports': async (req, env) => {
     const ip = clientIp(req)
     const b = await readBody<{ name?: string; reason?: string; detail?: string; turnstile?: string }>(req)
@@ -591,6 +614,11 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
   }
   // Antrean tinjauan: subdomain yang ditandai Cron karena namanya menyerupai merek atau tokoh.
   // Penandaannya tersimpan di history (sekali, tidak pernah dihapus), jadi daftar ini bersifat kumulatif.
+  if (req.method === 'GET' && url.pathname === '/api/admin/funnel') {
+    const rows = await env.DB.prepare('SELECT sid, ev, at FROM funnel_events WHERE at > ? ORDER BY at LIMIT 50000').bind(Date.now() - 30 * 86_400_000).all<{ sid: string; ev: string; at: number }>()
+    const c = await env.DB.prepare('SELECT COUNT(*) AS n, AVG(score) AS avg FROM csat').first<{ n: number; avg: number | null }>()
+    return json({ days: 30, ...summarizeFunnel(rows.results), csat: { responses: c?.n ?? 0, average: c?.avg ?? null } })
+  }
   if (req.method === 'GET' && url.pathname === '/api/admin/reviews') {
     const rows = await env.DB.prepare("SELECT s.name, s.platform, s.type, s.value, s.status, s.activated_at, u.email AS owner_email, u.blocked AS owner_blocked, (SELECT MIN(h.at) FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') AS flagged_at FROM subdomains s JOIN users u ON u.id = s.user_id WHERE EXISTS (SELECT 1 FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') ORDER BY flagged_at DESC LIMIT 200").all()
     return json({ reviews: rows.results })

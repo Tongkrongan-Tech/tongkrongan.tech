@@ -6,6 +6,7 @@ import { useStore, type Sub } from '../lib/store'
 import { platformById, validateValue, type RecordType } from '../lib/dns'
 import { CopyButton, Dialog, Icon, Sparkline, Spinner, StatusBadge } from '../components/ui'
 import { Count } from '../components/fx'
+import { Csat } from '../components/Csat'
 
 function EditDialog({ sub, onClose, onError }: { sub: Sub | null; onClose: () => void; onError: (m: string) => void }) {
   const { t, te, domain } = usePrefs()
@@ -175,6 +176,7 @@ export function Dashboard() {
                       <span className="mono break-all">{s.value}</span>
                     </p>
                     {(s.status === 'failed' || s.status === 'suspended') && s.failReason && <p role="alert" className="mt-3 rounded-lg border-2 p-3 text-sm font-medium" style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t(`val.${s.failReason}`, { host: `${s.name}.${domain}`, p: platformById(s.platform).name })}</p>}
+                    {s.status === 'active' && !s.rated && Date.now() - s.createdAt < 14 * 86_400_000 && <Csat name={s.name} />}
                     <div className="mt-4"><p className="mb-1 text-xs font-bold" style={{ color: 'var(--muted)' }}>{t('dash.uptime')}</p><Sparkline data={s.checks} label={t('dash.uptimeEmpty')} /></div>
                     <div className="mt-5 flex flex-wrap gap-2">
                       <CopyButton text={`https://${address}`} label={`${t('ui.copy')} ${address}`} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
@@ -8,6 +8,8 @@ import { genericTxtInvalid } from '../lib/txt'
 import { PLATFORMS, platformById, validateValue, type PlatformId, type RecordType } from '../lib/dns'
 import { checkName } from '../lib/names'
 import { NameChecker, useNameCheck } from '../components/NameChecker'
+import { Csat } from '../components/Csat'
+import { track } from '../lib/track'
 import { DnsDiagram } from '../components/DnsDiagram'
 import { Plate } from '../components/Plate'
 import { Burst } from '../components/fx'
@@ -66,6 +68,7 @@ export function Claim() {
   const txtInput = platform === 'vercel' ? { txtLabel: vercelTxt ? '_vercel' : '', txtValue: vercelTxt } : { txtLabel: genValue ? genLabel : '', txtValue: genValue }
 
   useEffect(() => { document.title = `${t('claim.title')} | Tongkrongan.tech` }, [t])
+  useEffect(() => { track('wizard_start') }, [])
   // Lanjutkan subdomain milik sendiri yang belum aktif (mis. setelah muat ulang halaman).
   useEffect(() => {
     if (!ready || !mine || mine.status === 'active' || step !== 0 || !initial) return
@@ -86,7 +89,8 @@ export function Claim() {
       } catch (e) { setError(te(e)); setBusy(false); return }
       setBusy(false)
     }
-    if (step === 2) { setTries(0); setPolling(true) }
+    if (step === 1) track('wizard_platform')
+    if (step === 2) { track('wizard_record'); setTries(0); setPolling(true) }
     setStep((s) => Math.min(3, s + 1))
   }
 
@@ -110,7 +114,7 @@ export function Claim() {
   async function autoVercel() {
     setBusy(true); setError('')
     try { await connectVercel(clean, vProject) } catch (e) { setError(te(e)); setBusy(false); return }
-    setBusy(false); setTries(0); setPolling(true); setStep(3)
+    track('wizard_record'); setBusy(false); setTries(0); setPolling(true); setStep(3)
   }
 
   async function runVerify() {
@@ -123,6 +127,16 @@ export function Claim() {
   const rawStatus = cur?.status ?? 'pending'
   const MAX_TRIES = 18
   const status = polling && rawStatus !== 'active' && rawStatus !== 'suspended' ? 'verifying' : rawStatus
+
+  // Funnel: sukses hanya dihitung bila subdomain tadinya belum aktif di sesi ini; gagal dihitung sekali setelah cek otomatis habis.
+  const wasInactive = useRef(false)
+  const failSent = useRef(false)
+  useEffect(() => {
+    if (step !== 3 || !cur) return
+    if (rawStatus !== 'active') wasInactive.current = true
+    else if (wasInactive.current) { wasInactive.current = false; track('verify_ok') }
+    if (rawStatus === 'failed' && !polling && !failSent.current) { failSent.current = true; track('verify_fail') }
+  }, [step, cur, rawStatus, polling])
 
   // Cek otomatis tiap 10 detik (pertama 3 detik setelah record dibuat), maksimal 3 menit.
   useEffect(() => {
@@ -312,6 +326,9 @@ export function Claim() {
                         <p className="font-extrabold">{t('claim.celebrate')}</p>
                         <p className="mt-1 text-sm font-medium">{t('claim.successHint')}</p>
                       </motion.div>
+                    )}
+                    {status === 'active' && cur && !cur.rated && (
+                      <Csat name={cur.name} />
                     )}
                   </div>
 
