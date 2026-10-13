@@ -56,6 +56,16 @@ function Settings({ inline = false }: { inline?: boolean }) {
     ))
   }
 
+  // Pola radiogroup: panah memindahkan pilihan dan fokus; hanya satu opsi masuk urutan Tab.
+  function onThemeKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key]
+    if (!d) return
+    e.preventDefault()
+    const next = THEMES[(THEMES.indexOf(resolved) + d + THEMES.length) % THEMES.length]
+    setTheme(next)
+    requestAnimationFrame(() => e.currentTarget.querySelector<HTMLElement>(`[data-theme-opt="${next}"]`)?.focus())
+  }
+
   const head = 'px-1 pb-1.5 pt-1 text-xs font-extrabold'
   const panel = (
     <>
@@ -66,11 +76,11 @@ function Settings({ inline = false }: { inline?: boolean }) {
         ))}
       </div>
       <p className={head} style={{ color: 'var(--muted)' }}>{t('theme.label')}</p>
-      <div role="radiogroup" aria-label={t('theme.label')} className="grid gap-0.5">
+      <div role="radiogroup" aria-label={t('theme.label')} className="grid gap-0.5" onKeyDown={onThemeKey}>
         {THEMES.map((th) => {
           const on = resolved === th
           return (
-            <button key={th} role="radio" aria-checked={on} type="button" onClick={(e) => pick(th, e)} className="relative flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 p-2 text-left text-sm font-bold hover:bg-[var(--surface-2)]" style={{ background: on ? 'var(--surface-2)' : 'transparent', color: 'var(--ink)' }}>
+            <button key={th} role="radio" aria-checked={on} tabIndex={on ? 0 : -1} data-theme-opt={th} type="button" onClick={(e) => pick(th, e)} className="relative flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 p-2 text-left text-sm font-bold hover:bg-[var(--surface-2)]" style={{ background: on ? 'var(--surface-2)' : 'transparent', color: 'var(--ink)' }}>
               <Swatch id={th} />
               <span className="flex-1">{t(`theme.${th}`)}</span>
               {on && <motion.span layoutId={inline ? 'th-check-m' : 'th-check'} className="grid place-items-center" style={{ color: 'var(--accent-text)' }}><Icon.check size={16} /></motion.span>}
@@ -106,6 +116,8 @@ export function Layout() {
   const { user, logout } = useStore()
   const [menu, setMenu] = useState(false)
   const loc = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  const firstRoute = useRef(true)
   useRouteSeo()
 
   useEffect(() => { setMenu(false) }, [loc.pathname])
@@ -116,6 +128,15 @@ export function Layout() {
     }
     window.scrollTo({ top: 0 })
   }, [loc.pathname, loc.hash])
+  // Pindah halaman: fokus ke <main> agar pembaca layar tahu konten berganti. Lewati muatan pertama dan jangan rebut fokus dari kolom yang sedang diisi.
+  useEffect(() => {
+    if (firstRoute.current) { firstRoute.current = false; return }
+    if (loc.hash) return
+    const a = document.activeElement
+    if (a instanceof HTMLElement && a !== document.body && a.closest('input, textarea, select, [contenteditable="true"]')) return
+    mainRef.current?.focus({ preventScroll: true })
+  }, [loc.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!menu) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false) }
@@ -182,7 +203,7 @@ export function Layout() {
 
       {configError && <p role="alert" className="fixed inset-x-0 top-[4.5rem] z-40 mx-auto w-fit max-w-[92vw] rounded-md border-2 px-4 py-2 text-center text-sm font-bold" style={{ background: 'var(--surface)', borderColor: 'var(--bad)', color: 'var(--bad)' }}>{t('config.error')}</p>}
 
-      <main id="main" className="relative flex-1 pt-16" tabIndex={-1}>
+      <main id="main" ref={mainRef} className="relative flex-1 pt-16 outline-none" tabIndex={-1}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={loc.pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
             <Suspense fallback={<div className="grid min-h-[60vh] place-items-center" style={{ color: 'var(--accent-text)' }} role="status" aria-label={t('ui.loading')}><Spinner size={34} /></div>}>

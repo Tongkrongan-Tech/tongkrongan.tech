@@ -6,8 +6,9 @@ import { usePrefs } from '../lib/prefs'
 import { Icon, Spinner } from '../components/ui'
 import { Burst, Mark, Words } from '../components/fx'
 import { Turnstile } from '../components/Turnstile'
+import { NAME_RE } from '../lib/names'
+import { REPORT_REASONS } from '../lib/report'
 
-const REASONS = ['phishing', 'malware', 'spam', 'illegal', 'impersonation', 'other'] as const
 
 export function Report() {
   const { t, te, domain, config } = usePrefs()
@@ -25,7 +26,7 @@ export function Report() {
     e.preventDefault()
     const n = name.trim().toLowerCase().replace(new RegExp(`\\.${domain.replace(/\./g, '\\.')}$`), '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
     const next: Record<string, string> = {}
-    if (!/^[a-z0-9-]{3,32}$/.test(n)) next.name = t('report.err.name')
+    if (!NAME_RE.test(n)) next.name = t('report.err.name')
     if (!reason) next.reason = t('report.err.reason')
     setErr(next)
     if (Object.keys(next).length) return
@@ -69,7 +70,7 @@ export function Report() {
         <fieldset className="m-0 border-0 p-0">
           <legend className="label">{t('report.reason')}</legend>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-describedby="rr-e">
-            {REASONS.map((r) => (
+            {REPORT_REASONS.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={reason === r} onClick={() => setReason(r)} className="chip" style={{ borderColor: reason === r ? 'var(--ink)' : undefined, background: reason === r ? 'var(--hl)' : undefined, color: reason === r ? 'var(--hl-ink)' : undefined }}>
                 {reason === r && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}><Icon.check size={14} /></motion.span>}{t(`report.r.${r}`)}
               </button>

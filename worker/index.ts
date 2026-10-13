@@ -1,5 +1,6 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
 import { classifyName } from '../src/lib/reserved'
+import { REPORT_REASONS } from '../src/lib/report'
 import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
 import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
@@ -11,7 +12,6 @@ import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomai
 const SESSION_DAYS = 14
 const MAX_BODY = 65536
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
-const REASONS = ['phishing', 'malware', 'spam', 'illegal', 'impersonation', 'other']
 const TYPES: RecordType[] = ['A', 'AAAA', 'CNAME', 'TXT']
 
 // Header keamanan untuk semua respons. CSP mengizinkan skrip inline (bootstrap tema di index.html) dan Cloudflare Turnstile.
@@ -191,7 +191,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (base.kind === 'empty') return json({ state: 'empty' })
     const user = await currentUser(req, env)
     const row = await env.DB.prepare('SELECT user_id FROM subdomains WHERE name = ?').bind(name).first<{ user_id: string }>()
-    if (!row) return json({ state: 'ok' })
+    if (!row) return json({ state: 'ok', review: base.review === true })
     const cands = suggestCandidates(name)
     let free = cands
     if (cands.length) {
@@ -519,7 +519,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!(await verifyTurnstile(env, b.turnstile, ip))) throw new HttpError(400, 'captcha')
     const name = String(b.name ?? '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(new RegExp(`\\.${env.BASE_DOMAIN.replace(/\./g, '\\.')}$`), '')
     if (!NAME_RE.test(name)) throw new HttpError(422, 'name')
-    if (!REASONS.includes(String(b.reason))) throw new HttpError(422, 'reason')
+    if (!(REPORT_REASONS as readonly string[]).includes(String(b.reason))) throw new HttpError(422, 'reason')
     const exists = await env.DB.prepare('SELECT 1 FROM subdomains WHERE name = ?').bind(name).first()
     if (!exists) throw new HttpError(404, 'not_found')
     const id = randomHex(8).toUpperCase()

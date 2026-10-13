@@ -63,3 +63,21 @@ test('kunci riwayat punya teks ID dan EN yang tidak kosong', () => {
   }
   assert.deepEqual(bad, [], 'kunci riwayat tanpa dua bahasa: ' + bad.join(', '))
 })
+
+test('setiap kunci t(...) literal dan name.err.* ada di dict (#45)', () => {
+  const keys = dictKeys()
+  const used = new Set<string>()
+  for (const file of tsFiles(srcDir)) {
+    if (file.endsWith(path.join('lib', 'dict.ts'))) continue
+    for (const m of readFileSync(file, 'utf8').matchAll(/\bt\(\s*'([^']+)'/g)) used.add(m[1])
+  }
+  const names = readFileSync(new URL('../src/lib/names.ts', import.meta.url), 'utf8')
+  const reasons = names.match(/reason: ([^}]+) }/)![1].match(/'([a-z]+)'/g)!.map((s) => `name.err.${s.slice(1, -1)}`)
+  const missing = [...used, ...reasons].filter((k) => !keys.has(k)).sort()
+  assert.deepEqual(missing, [], 'kunci tanpa terjemahan: ' + missing.join(', '))
+})
+
+test('semua kunci dict punya teks ID dan EN yang tidak kosong', () => {
+  const bad = [...dictKeys()].filter(([, p]) => p.filter((x) => x !== "''" && x !== '').length !== 2).map(([k]) => k)
+  assert.deepEqual(bad, [], 'kunci tanpa dua bahasa: ' + bad.join(', '))
+})

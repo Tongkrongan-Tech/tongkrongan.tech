@@ -2,11 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { ADMIN_REASONS } from '../src/lib/admin.ts'
+import { REPORT_REASONS } from '../src/lib/report.ts'
 
-test('alasan di UI admin sama dengan REASONS di backend', () => {
+test('alasan di UI admin sama dengan REPORT_REASONS yang dipakai backend', () => {
+  assert.deepEqual(Object.keys(ADMIN_REASONS).sort(), [...REPORT_REASONS].sort())
   const src = readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8')
-  const backend = src.match(/const REASONS = \[([^\]]*)\]/)![1].match(/'([^']+)'/g)!.map((s) => s.slice(1, -1))
-  assert.deepEqual(Object.keys(ADMIN_REASONS).sort(), backend.sort())
+  assert.match(src, /REPORT_REASONS/)
 })
 
 test('endpoint info subdomain admin dilindungi oleh pemeriksaan token yang sama', () => {

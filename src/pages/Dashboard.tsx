@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { usePrefs } from '../lib/prefs'
@@ -62,6 +62,14 @@ export function Dashboard() {
   const [hist, setHist] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [q, setQ] = useState('')
+  const [statusF, setStatusF] = useState<'all' | 'active' | 'waiting' | 'failed' | 'suspended'>('all')
+  const [sort, setSort] = useState<'new' | 'old' | 'name'>('new')
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const list = subs.filter((s) => (!needle || s.name.includes(needle)) && (statusF === 'all' || (statusF === 'waiting' ? s.status === 'pending' || s.status === 'verifying' : s.status === statusF)))
+    return list.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'old' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt)
+  }, [subs, q, statusF, sort])
 
   useEffect(() => { document.title = `${t('nav.dashboard')} | Tongkrongan.tech` }, [t])
 
@@ -135,9 +143,25 @@ export function Dashboard() {
             <Link to="/claim" className="btn btn-primary mt-6">{t('dash.empty.cta')}</Link>
           </div>
         ) : (
+          <>
+          {subs.length > 1 && (
+            <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+              <div><label htmlFor="ds" className="sr-only">{t('dash.search')}</label><input id="ds" type="search" className="field" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('dash.search')} autoComplete="off" spellCheck={false} /></div>
+              <div><label htmlFor="df" className="sr-only">{t('dash.filter')}</label>
+                <select id="df" className="field" value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)}>
+                  <option value="all">{t('dash.filter.all')}</option><option value="active">{t('status.active')}</option><option value="waiting">{t('dash.filter.waiting')}</option><option value="failed">{t('status.failed')}</option><option value="suspended">{t('status.suspended')}</option>
+                </select></div>
+              <div><label htmlFor="do" className="sr-only">{t('dash.sort')}</label>
+                <select id="do" className="field" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+                  <option value="new">{t('dash.sort.new')}</option><option value="old">{t('dash.sort.old')}</option><option value="name">{t('dash.sort.name')}</option>
+                </select></div>
+              <p className="hint sm:col-span-3" role="status">{t('dash.shown', { n: shown.length, total: subs.length })}</p>
+            </div>
+          )}
+          {shown.length === 0 && <p className="card p-6 text-center font-semibold" style={{ color: 'var(--muted)' }}>{t('dash.noMatch')}</p>}
           <div className="grid gap-5 md:grid-cols-2">
             <AnimatePresence>
-              {subs.map((s, k) => {
+              {shown.map((s, k) => {
                 const address = `${s.name}.${domain}`
                 return (
                   <motion.article key={s.name} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, rotate: -2 }} transition={{ delay: k * 0.07, type: 'spring', stiffness: 260, damping: 24 }} whileHover={{ y: -4 }} className="card p-5" style={{ borderColor: 'var(--ink)', borderWidth: 1.5, boxShadow: '4px 4px 0 var(--sh)' }}>
@@ -172,6 +196,7 @@ export function Dashboard() {
               })}
             </AnimatePresence>
           </div>
+          </>
         )}
       </div>
 

@@ -5,7 +5,7 @@ export const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/
 
 export type NameState =
   | { kind: 'empty' }
-  | { kind: 'invalid'; reason: 'short' | 'long' | 'chars' | 'edge' | 'reserved' | 'brand' }
+  | { kind: 'invalid'; reason: 'short' | 'long' | 'chars' | 'edge' | 'reserved' | 'brand' | 'profanity' }
   | { kind: 'taken'; mine?: boolean }
   | { kind: 'ok'; review?: boolean }
 
@@ -18,7 +18,8 @@ export function checkName(raw: string, taken: string[] = [], mine: string[] = []
   if (n.startsWith('-') || n.endsWith('-')) return { kind: 'invalid', reason: 'edge' }
   // Daftar terlarang (vital, merek, tokoh, kata kasar) dengan normalisasi leet dan tanda hubung.
   const v = classifyName(n)
-  if (v.block === 'brand') return { kind: 'invalid', reason: 'brand' }
+  if (v.block === 'brand' || v.block === 'people') return { kind: 'invalid', reason: 'brand' }
+  if (v.block === 'profanity') return { kind: 'invalid', reason: 'profanity' }
   if (v.block) return { kind: 'invalid', reason: 'reserved' }
   if (mine.includes(n)) return { kind: 'taken', mine: true }
   if (taken.includes(n)) return { kind: 'taken' }

@@ -1,4 +1,4 @@
-// Konstanta UI admin. Alasan laporan harus sama dengan REASONS di worker/index.ts (dijaga tests/admin.test.ts).
+// Konstanta UI admin. Alasan laporan harus sama dengan REPORT_REASONS di src/lib/report.ts (dijaga tests/admin.test.ts).
 export const ADMIN_REASONS: Record<string, { label: string; severe: boolean }> = {
   phishing: { label: 'Phishing', severe: true },
   malware: { label: 'Malware', severe: true },

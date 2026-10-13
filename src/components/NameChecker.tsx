@@ -21,9 +21,9 @@ export function useNameCheck(value: string) {
     let dead = false
     const id = setTimeout(async () => {
       try {
-        const r = await api<{ state: 'ok' | 'taken' | 'invalid'; reason?: string; mine?: boolean; suggestions?: string[] }>(`/check?name=${encodeURIComponent(n)}`)
+        const r = await api<{ state: 'ok' | 'taken' | 'invalid'; reason?: string; mine?: boolean; review?: boolean; suggestions?: string[] }>(`/check?name=${encodeURIComponent(n)}`)
         if (dead) return
-        setState(r.state === 'ok' ? { kind: 'ok' } : r.state === 'taken' ? { kind: 'taken', mine: r.mine } : { kind: 'invalid', reason: r.reason as 'reserved' })
+        setState(r.state === 'ok' ? { kind: 'ok', review: r.review ?? (local.kind === 'ok' && local.review) } : r.state === 'taken' ? { kind: 'taken', mine: r.mine } : { kind: 'invalid', reason: r.reason as 'reserved' })
         setSuggestions(r.suggestions ?? [])
       } catch {
         if (!dead) setState({ kind: 'error' })
@@ -49,7 +49,7 @@ export function NameChecker({ value, onChange, cta = true, onPick, showLabel = f
 
   // Getar sekali saat status berubah menjadi ditolak (bukan setiap ketukan).
   useEffect(() => {
-    if (sig === 'taken' || sig === 'invalid-reserved' || sig === 'invalid-brand' || sig === 'invalid-chars') void shake.start({ x: [0, -7, 7, -4, 4, 0], transition: { duration: 0.4 } })
+    if (sig === 'taken' || sig === 'invalid-reserved' || sig === 'invalid-brand' || sig === 'invalid-profanity' || sig === 'invalid-chars') void shake.start({ x: [0, -7, 7, -4, 4, 0], transition: { duration: 0.4 } })
   }, [sig, shake])
 
   // Tekan "/" di mana saja untuk langsung mengetik nama.
@@ -105,6 +105,7 @@ export function NameChecker({ value, onChange, cta = true, onPick, showLabel = f
             <span>{checking ? t('name.checking') : t(msgKey, { name: clean })}</span>
           </motion.div>
         </AnimatePresence>
+        {ok && state.kind === 'ok' && state.review && <p className="hint mt-1">{t('name.review')}</p>}
         <AnimatePresence>
           {!checking && suggestions.length > 0 && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-2 flex flex-wrap items-center gap-2">
