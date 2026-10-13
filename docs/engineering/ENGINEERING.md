@@ -113,6 +113,11 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 
 ## Log Perubahan
 
+### 2026-10-13, rilis percepatan LCP, issue #39
+- Commit kode `a3a3d3d` dipush ke `main`. Tanpa migrasi D1. Build dan deploy berhasil; versi Worker `39ac4842-ed1b-4b92-b9d5-bac4ace6274d` aktif di `https://tongkrongan.tech`.
+- Isi: logo WebP dan preload chunk halaman (rincian di [audit](AUDIT-2026-10-13.md)). Pemeriksaan produksi: Home, Claim, Login menjawab 200, `logo-wordmark.webp` dan `logo-full.webp` 200 `image/webp`, HTML Claim memuat skrip preload, respons Brotli, `/api/config` normal.
+- Lighthouse mobile langsung ke produksi, 3 run per halaman, LCP median: Home 1,85 s, Claim 1,68 s, Dashboard 1,68 s, Login 1,89 s, Report 2,60 s. Variasi besar antar run (terburuk 3,65 s pada Report), jadi satu angka tidak mewakili. #39 tetap terbuka: Report belum di bawah 2,5 s pada median, belum ada pengukuran data pengguna nyata, uji VoiceOver/NVDA belum dilakukan.
+
 ### 2026-10-13, rilis perbaikan #4 dan #39
 - Commit kode `37a59eaa9a99d6d0b5499e1cff6e6e0b51d78b74` dipush ke `main`; [CI lulus](https://github.com/Tongkrongan-Tech/tongkrongan.tech/actions/runs/38341629246).
 - Migrasi D1 produksi `0008_ownership_token.sql` berhasil diterapkan sebelum deploy. Build dan deploy berhasil; versi Worker `702c8835-88c8-490a-9872-317ae5f4eb0f` aktif di `https://tongkrongan.tech` dan endpoint workers.dev.
