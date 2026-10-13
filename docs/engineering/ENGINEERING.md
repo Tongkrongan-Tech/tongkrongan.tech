@@ -113,6 +113,12 @@ Batas laju (tabel `rate_limits`): cek nama 120/menit/IP, daftar 5/jam/IP, login 
 
 ## Log Perubahan
 
+### 2026-10-13, rilis perbaikan #4 dan #39
+- Commit kode `37a59eaa9a99d6d0b5499e1cff6e6e0b51d78b74` dipush ke `main`; [CI lulus](https://github.com/Tongkrongan-Tech/tongkrongan.tech/actions/runs/38341629246).
+- Migrasi D1 produksi `0008_ownership_token.sql` berhasil diterapkan sebelum deploy. Build dan deploy berhasil; versi Worker `702c8835-88c8-490a-9872-317ae5f4eb0f` aktif di `https://tongkrongan.tech` dan endpoint workers.dev.
+- Pemeriksaan produksi: Home, Claim, Dashboard, Login, Report, `/api/config`, `/api/auth/me`, `/api/public/subdomains`, dan aset JavaScript baru menjawab HTTP 200. HTML menunjuk aset build yang baru; konfigurasi memastikan DNS live (`mock: false`). Pemeriksaan ini read-only, bukan uji klaim dengan hosting sungguhan.
+- Batas audit #39 tetap berlaku: target LCP 2,5 detik dan uji VoiceOver/NVDA langsung belum terpenuhi. Catatan "belum deploy" di audit sebelumnya menggambarkan keadaan sebelum rilis ini.
+
 ### 2026-10-13, audit aksesibilitas dan performa, issue #39
 - Perbaikan judul animasi, nama aksesibel kontrol, kontras tab/placeholder papan, keyboard radio, fokus wizard, pemilih tema, dan dialog native. Main mencadangkan tinggi viewport; font utama di-preload.
 - Build, tes, kontras, dan browser lulus. Lighthouse accessibility 100 di lima halaman; axe 30 kombinasi halaman/tema ditambah dialog mobile bersih. Skrip audit opsional dan [hasil lengkap](AUDIT-2026-10-13.md) disimpan.
