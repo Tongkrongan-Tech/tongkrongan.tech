@@ -168,6 +168,7 @@ export function Layout() {
             {user ? (
               <>
                 <Link to="/dashboard" className="btn btn-sm !hidden sm:!inline-flex">{t('nav.dashboard')}</Link>
+                <Link to="/settings" className="btn btn-sm btn-ghost !hidden lg:!inline-flex">{t('nav.settings')}</Link>
                 <button type="button" onClick={() => void logout()} className="btn btn-sm btn-ghost !hidden lg:!inline-flex">{t('nav.logout')}</button>
               </>
             ) : (
@@ -187,7 +188,7 @@ export function Layout() {
         {menu && (
           <motion.nav id="mobile-menu" aria-label={t('nav.main')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 overflow-y-auto px-5 pb-8 pt-20 lg:hidden" style={{ background: 'var(--bg)' }}>
             <ul className="grid">
-              {[...links, { to: '/claim', label: t('nav.claim') }, { to: '/dashboard', label: t('nav.dashboard') }, { to: '/report', label: t('nav.report') }].map((l, i) => (
+              {[...links, { to: '/claim', label: t('nav.claim') }, { to: '/dashboard', label: t('nav.dashboard') }, ...(user ? [{ to: '/settings', label: t('nav.settings') }] : []), { to: '/report', label: t('nav.report') }].map((l, i) => (
                 <motion.li key={l.to} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.03 * i + 0.04 }}>
                   <Link to={l.to} className="flex min-h-14 items-center border-b py-3 text-2xl font-extrabold tracking-tight no-underline" style={{ borderColor: 'var(--line-2)', color: 'var(--ink)' }}>{l.label}</Link>
                 </motion.li>

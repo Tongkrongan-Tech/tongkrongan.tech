@@ -123,6 +123,29 @@ async function ownedSub(env: Env, user: User, name: string) {
   return s
 }
 
+// Lepas satu subdomain: hapus record DNS (utama dan TXT), domain di proyek Vercel, lalu barisnya. Dipakai hapus subdomain dan hapus akun.
+async function releaseSub(env: Env, u: User, s: SubRow) {
+  try { await deleteRecord(env, s.cf_record_id); await deleteRecord(env, s.txt_record_id) } catch (e) { console.error('deleteRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
+  if (s.platform === 'vercel' && s.vercel_project) {
+    const conn = await getConnection(env, u.id).catch(() => null)
+    if (conn) await removeProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
+  }
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM history WHERE name = ?').bind(s.name),
+    env.DB.prepare('DELETE FROM checks WHERE name = ?').bind(s.name),
+    env.DB.prepare('DELETE FROM subdomains WHERE name = ?').bind(s.name),
+  ])
+}
+
+// Cocokkan sandi dengan hash tersimpan (waktu konstan). Akun masuk lewat OAuth tidak punya sandi, hasilnya null.
+async function checkPassword(env: Env, userId: string, pw: string): Promise<boolean | null> {
+  const r = await env.DB.prepare('SELECT pw_hash, pw_salt FROM users WHERE id = ?').bind(userId).first<{ pw_hash: string | null; pw_salt: string | null }>()
+  if (!r?.pw_hash || !r.pw_salt) return null
+  const stored = parsePasswordHash(r.pw_hash)
+  const attempt = await hashPassword(pw, r.pw_salt, Math.min(stored.iterations, PBKDF2_ITERATIONS))
+  return safeEqual(attempt.slice(attempt.indexOf('$') + 1), stored.hash)
+}
+
 function validateRecordInput(env: Env, b: { name?: string; platform?: string; type?: string; value?: string; txtLabel?: string; txtValue?: string }) {
   const name = String(b.name ?? '').toLowerCase().trim()
   const platform = PLATFORMS.find((p) => p.id === b.platform)
@@ -499,17 +522,45 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const u = await requireUser(req, env)
     const s = await ownedSub(env, u, m[1])
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
-    try { await deleteRecord(env, s.cf_record_id); await deleteRecord(env, s.txt_record_id) } catch (e) { console.error('deleteRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
-    if (s.platform === 'vercel' && s.vercel_project) {
-      const conn = await getConnection(env, u.id).catch(() => null)
-      if (conn) await removeProjectDomain(conn, s.vercel_project, `${s.name}.${env.BASE_DOMAIN}`).catch(() => {})
-    }
+    await releaseSub(env, u, s)
+    return json({ ok: true })
+  },
+
+  // Ganti sandi saat sudah masuk: wajib sandi lama. Sesi lain dicabut, sesi ini tetap.
+  'POST /api/account/password': async (req, env) => {
+    const u = await requireUser(req, env)
+    const b = await readBody<{ current?: string; password?: string }>(req)
+    if (!(await rateLimit(env, `pwchange:${u.id}`, 5, 900))) throw new HttpError(429, 'rate_limited')
+    const pw = String(b.password ?? '')
+    if (pw.length < 8 || pw.length > 128) throw new HttpError(422, 'password')
+    const ok = await checkPassword(env, u.id, String(b.current ?? ''))
+    if (ok === null) throw new HttpError(403, 'no_password')
+    if (!ok) throw new HttpError(401, 'invalid_credentials')
+    const salt = randomHex(16)
+    const keep = await sha256(readSession(req) ?? '')
     await env.DB.batch([
-      env.DB.prepare('DELETE FROM history WHERE name = ?').bind(s.name),
-      env.DB.prepare('DELETE FROM checks WHERE name = ?').bind(s.name),
-      env.DB.prepare('DELETE FROM subdomains WHERE name = ?').bind(s.name),
+      env.DB.prepare('UPDATE users SET pw_hash = ?, pw_salt = ? WHERE id = ?').bind(await hashPassword(pw, salt), salt, u.id),
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(u.id, keep),
+      env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(u.id),
     ])
     return json({ ok: true })
+  },
+
+  // Hapus akun beserta semua subdomain. Akun sandi: konfirmasi dengan sandi. Akun OAuth: ketik ulang email.
+  'POST /api/account/delete': async (req, env) => {
+    const u = await requireUser(req, env)
+    const b = await readBody<{ password?: string; confirm?: string }>(req)
+    if (!(await rateLimit(env, `acctdel:${u.id}`, 5, 900))) throw new HttpError(429, 'rate_limited')
+    const ok = await checkPassword(env, u.id, String(b.password ?? ''))
+    if (ok === false) throw new HttpError(401, 'invalid_credentials')
+    if (ok === null && String(b.confirm ?? '').trim().toLowerCase() !== u.email) throw new HttpError(422, 'confirm')
+    const subs = await env.DB.prepare('SELECT * FROM subdomains WHERE user_id = ?').bind(u.id).all<SubRow>()
+    for (const s of subs.results) await releaseSub(env, u, s)
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(u.id),
+      env.DB.prepare('DELETE FROM users WHERE id = ?').bind(u.id),
+    ])
+    return clearSessionCookies(req, { ok: true })
   },
 
   'POST /api/reports': async (req, env) => {

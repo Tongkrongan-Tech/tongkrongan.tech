@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default:
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })))
 const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })))
 const Report = lazy(() => import('./pages/Report').then((m) => ({ default: m.Report })))
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })))
 const Admin = lazy(() => import('./pages/Admin').then((m) => ({ default: m.Admin })))
 const Legal = lazy(() => import('./pages/Legal').then((m) => ({ default: m.Legal })))
 const NotFound = lazy(() => import('./pages/NotFound').then((m) => ({ default: m.NotFound })))
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="login" element={<Login />} />
                 <Route path="reset" element={<ResetPassword />} />
+                <Route path="settings" element={<Settings />} />
                 <Route path="report" element={<Report />} />
                 <Route path="admin" element={<Admin />} />
                 <Route path="terms" element={<Legal doc="terms" />} />
