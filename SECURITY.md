@@ -26,6 +26,10 @@ Termasuk cakupan: kebocoran data akun, bypass autentikasi atau otorisasi, pembua
 
 Di luar cakupan: serangan yang memerlukan akses fisik, rekayasa sosial, dan temuan pada layanan pihak ketiga. Temuan pada layanan pihak ketiga sebaiknya dilaporkan ke penyedia masing-masing.
 
+## Kata sandi
+
+Kata sandi disimpan sebagai PBKDF2-SHA256 dengan salt acak per akun; kata sandi aslinya tidak pernah disimpan. Jumlah iterasi mengikuti batas platform Cloudflare Workers (100.000 — nilai lebih tinggi ditolak saat runtime), sedikit di bawah rekomendasi OWASP untuk PBKDF2. Sebagai kompensasi, kata sandi minimal 8 karakter, percobaan masuk dibatasi lajunya, dan hash lama otomatis dinaikkan ke jumlah iterasi terbaru saat pemiliknya berhasil masuk. Bila platform menaikkan batasnya, konstanta `PBKDF2_ITERATIONS` di `worker/lib.ts` cukup dinaikkan: hash lama tetap terbaca karena jumlah iterasinya tersimpan bersama hash.
+
 ## Rahasia dan token
 
 Jangan pernah menaruh token atau kredensial di issue, pull request, atau commit. Bila token atau kredensial (misalnya token Discord atau token API Cloudflare) sampai ter-push, segera reset token lewat Developer Portal atau penyedia terkait. Menghapus commit saja tidak cukup, karena commit lama masih bisa diakses dari riwayat atau fork.

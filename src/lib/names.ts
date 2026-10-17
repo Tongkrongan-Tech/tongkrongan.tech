@@ -1,5 +1,5 @@
 // Aturan nama F3: 3-32 karakter, huruf kecil, angka, tanda hubung.
-import { classifyName } from './reserved'
+import { classifyName } from './reserved.ts'
 
 export const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/
 

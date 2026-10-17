@@ -72,6 +72,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     login: async (email, password, turnstile) => { await api('/auth/login', { body: { email, password, turnstile } }); await refresh() },
     signup: async (email, password, turnstile) => {
       const r = await api<{ needVerify?: boolean }>('/auth/signup', { body: { email, password, turnstile } })
+      // Tanpa verifikasi email, akun langsung aktif TETAPI sesi tidak diberikan dari /signup (anti enumerasi #74).
+      // Pengguna masuk lewat formulir Masuk; refresh() tetap dipanggil agar /auth/me memuat sesi bila ada.
       if (!r.needVerify) await refresh()
       return { needVerify: !!r.needVerify }
     },

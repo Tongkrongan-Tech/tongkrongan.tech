@@ -1,5 +1,6 @@
 import type { Env } from './lib'
 import type { RecordType } from '../src/lib/dns'
+import { canonicalV6 } from '../src/lib/dns.ts'
 import { desecCreate, desecDelete, desecUpdate } from './desec.ts'
 
 const CF = 'https://api.cloudflare.com/client/v4'
@@ -64,7 +65,9 @@ export async function verifyRecord(env: Env, s: { name: string; type: RecordType
   const host = hostOf(env, s.name)
   const want = s.type === 'CNAME' ? s.value.replace(/\.$/, '').toLowerCase() : s.value.toLowerCase()
   const got = await doh(host, s.type).catch(() => [] as string[])
-  const match = s.type === 'AAAA' ? got.some((g) => g.replace(/:0+/g, ':') === want.replace(/:0+/g, ':') || g === want) : got.includes(want)
+  // Bandingkan AAAA dalam bentuk kanonik: "2001:0db8:0:0:0:0:0:10" harus cocok dengan "2001:db8::10" dari DoH (#72).
+  const canon = (x: string) => canonicalV6(x) ?? x.toLowerCase()
+  const match = s.type === 'AAAA' ? got.some((g) => canon(g) === canon(want)) : got.includes(want)
   if (!match) return { ok: false, reason: 'dns' }
   if (s.type === 'TXT') return { ok: false, reason: 'dns' } // TXT tidak boleh jadi tipe utama; verifikasi lewat tipe lain
   if (!s.ownership_token || !/^[a-f0-9]{64}$/.test(s.ownership_token)) return { ok: false, reason: 'ownership' }
@@ -96,10 +99,22 @@ export async function verifyRecord(env: Env, s: { name: string; type: RecordType
   return { ok: false, reason: answered ? 'ownership' : 'http' }
 }
 
+// Cek kesehatan origin: HEAD dulu, dan hanya status < 400 yang dianggap sehat.
+// 405/501 (metode tidak didukung) bukan bukti sehat, jadi diulang dengan GET sebelum menilai (#77).
+// Galat jaringan/TLS di satu skema dicoba di skema berikutnya (banyak hosting masih melayani http).
 export async function healthCheck(env: Env, name: string): Promise<boolean> {
   if (isMock(env)) return true
+  const host = hostOf(env, name)
   for (const scheme of ['https', 'http']) {
-    try { const r = await timedFetch(`${scheme}://${hostOf(env, name)}/`, { method: 'HEAD' }); return r.status < 500 } catch { /* lanjut */ }
+    for (const method of ['HEAD', 'GET']) {
+      try {
+        const r = await timedFetch(`${scheme}://${host}/`, { method, headers: method === 'GET' ? { range: 'bytes=0-0' } : undefined })
+        const status = r.status
+        try { await r.body?.cancel() } catch { /* abaikan */ }
+        if (status === 405 || status === 501) continue
+        return status < 400
+      } catch { break }
+    }
   }
   return false
 }

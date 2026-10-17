@@ -9,8 +9,8 @@ Terima kasih untuk semua yang sudah membantu project ini.
 - [@robbyaliasaakbar](https://github.com/robbyaliasaakbar)
 - [@xyyxzxx](https://github.com/xyyxzxx)
 
-Daftar di atas snapshot. Grafik dan riwayat kontribusi terbaru ada di https://github.com/xyyxzxx/tongkrongan.tech/graphs/contributors
+Daftar di atas snapshot. Grafik dan riwayat kontribusi terbaru ada di https://github.com/Tongkrongan-tech/tongkrongan.tech/graphs/contributors
 
-[![Kontributor](https://contrib.rocks/image?repo=xyyxzxx/tongkrongan.tech)](https://github.com/xyyxzxx/tongkrongan.tech/graphs/contributors)
+[![Kontributor](https://contrib.rocks/image?repo=Tongkrongan-tech/tongkrongan.tech)](https://github.com/Tongkrongan-tech/tongkrongan.tech/graphs/contributors)
 
 Ingin ikut? Baca dulu CONTRIBUTING.md, lalu cari label good first issue.

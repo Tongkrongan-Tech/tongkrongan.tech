@@ -1,27 +1,28 @@
-import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names'
-import { classifyName } from '../src/lib/reserved'
-import { REPORT_REASONS } from '../src/lib/report'
-import { FUNNEL_EVENTS, summarizeFunnel } from '../src/lib/funnel'
-import { PLATFORMS, validateValue, type RecordType } from '../src/lib/dns'
-import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib'
-import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns'
-import { runCron } from './cron'
-import { discordVerifiedEmail } from './oauth'
-import { notifyClaimActive, notifyVercelConnected } from './notify'
-import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel'
+import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names.ts'
+import { classifyName } from '../src/lib/reserved.ts'
+import { REPORT_REASONS } from '../src/lib/report.ts'
+import { FUNNEL_EVENTS, summarizeFunnel } from '../src/lib/funnel.ts'
+import { PLATFORMS, validateValue, canonicalV6, type RecordType } from '../src/lib/dns.ts'
+import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, csrfGuard, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, reportIpHash, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib.ts'
+import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns.ts'
+import { runCron } from './cron.ts'
+import { discordVerifiedEmail } from './oauth.ts'
+import { notifyClaimActive, notifyVercelConnected } from './notify.ts'
+import { addDomain, dropConnection, exchangeCode, getConnection, getProjectDomain, listProjects, recommendedCname, removeProjectDomain, saveConnection, makeState, checkState, vercelEnabled, verifyProjectDomain } from './vercel.ts'
 
 const SESSION_DAYS = 14
 const MAX_BODY = 65536
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$/
 const TYPES: RecordType[] = ['A', 'AAAA', 'CNAME', 'TXT']
 
-// Header keamanan untuk semua respons. CSP mengizinkan skrip inline (bootstrap tema di index.html) dan Cloudflare Turnstile.
+// Header keamanan untuk semua respons. CSP tidak lagi memakai 'unsafe-inline' untuk skrip:
+// bootstrap tema ada di /theme.js dan JSON-LD adalah data, bukan skrip yang dieksekusi (#79).
 const SECURITY_HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'geolocation=(), camera=(), microphone=(), payment=()',
-  'content-security-policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com",
+  'content-security-policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com",
 }
 
 // RFC 9116. Perbarui Expires sebelum kedaluwarsa.
@@ -30,7 +31,7 @@ const SECURITY_TXT = [
   'Expires: 2027-10-11T00:00:00.000Z',
   'Preferred-Languages: id, en',
   'Canonical: https://tongkrongan.tech/.well-known/security.txt',
-  'Policy: https://github.com/xyyxzxx/tongkrongan.tech/blob/main/SECURITY.md',
+  'Policy: https://github.com/Tongkrongan-tech/tongkrongan.tech/blob/main/SECURITY.md',
   '',
 ].join('\n')
 
@@ -82,13 +83,6 @@ function clearSessionCookies(req: Request, data: unknown): Response {
   headers.append('set-cookie', cookie(req, 'tt_session', '', 0))
   headers.append('set-cookie', cookie(req, '__Host-tt_session', '', 0))
   return new Response(JSON.stringify(data), { status: 200, headers })
-}
-
-function csrfGuard(req: Request) {
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return
-  const origin = req.headers.get('origin')
-  if (origin && new URL(origin).host !== new URL(req.url).host) throw new HttpError(403, 'bad_origin')
-  if (!origin && req.headers.get('authorization') === null && !(req.headers.get('content-type') ?? '').includes('json')) throw new HttpError(403, 'bad_origin')
 }
 
 // Kirim kode OTP 6 digit ke email. Jeda 60 detik antar kiriman per akun.
@@ -159,6 +153,8 @@ function validateRecordInput(env: Env, b: { name?: string; platform?: string; ty
   if (type === 'TXT') throw new HttpError(400, 'bad_input')
   const err = validateValue(type, value, name, env.BASE_DOMAIN)
   if (err) throw new HttpError(422, 'invalid_value', { reason: err })
+  // Simpan AAAA dalam bentuk kanonik agar pembandingan dengan jawaban DoH selalu cocok (#72).
+  const normalized = type === 'AAAA' ? canonicalV6(value)! : value
   const txtLabel = String(b.txtLabel ?? '').trim().toLowerCase().replace(/\.$/, '')
   const txtValue = String(b.txtValue ?? '').trim()
   if (txtLabel || txtValue) {
@@ -167,7 +163,7 @@ function validateRecordInput(env: Env, b: { name?: string; platform?: string; ty
     // TXT `_vercel` ada di domain induk, jadi nilainya wajib mengikat ke subdomain pemilik sendiri.
     if (txtLabel === '_vercel' && !new RegExp(`^vc-domain-verify=${(name + '.' + env.BASE_DOMAIN).replace(/\./g, '\\.')},[a-z0-9]{8,64}$`, 'i').test(txtValue)) throw new HttpError(422, 'invalid_txt')
   }
-  return { name, platform: platform.id, type, value, txtLabel: txtLabel || null, txtValue: txtValue || null }
+  return { name, platform: platform.id, type, value: normalized, txtLabel: txtLabel || null, txtValue: txtValue || null }
 }
 
 /* ---------- handlers ---------- */
@@ -179,8 +175,8 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(u.id).first<{ n: number }>()
     if ((count?.n ?? 0) >= quota(env)) throw new HttpError(403, 'quota')
     try {
-      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, txt_label, txt_value, created_at, ownership_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', b.txtLabel, b.txtValue, Date.now(), randomHex(32)).run()
+      await env.DB.prepare('INSERT INTO subdomains (name, user_id, platform, type, value, status, txt_label, txt_value, created_at, pending_since, ownership_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(b.name, u.id, b.platform, b.type, b.value, 'pending', b.txtLabel, b.txtValue, Date.now(), Date.now(), randomHex(32)).run()
     } catch { throw new HttpError(409, 'taken') }
     try {
       const rid = await createRecord(env, hostOf(env, b.name), b.type, b.value)
@@ -200,7 +196,7 @@ async function createSubdomain(env: Env, u: User, b: ReturnType<typeof validateR
   return ownedSub(env, u, b.name)
 }
 
-const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Promise<Response>> = {
+export const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Promise<Response>> = {
   'GET /api/config': async (_r, env) => json({
     baseDomain: env.BASE_DOMAIN, quota: quota(env),
     oauth: { github: !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET), google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET), discord: !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET) },
@@ -254,6 +250,8 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const exists = await env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()
     if (exists) {
       // Jangan ungkap apakah email terdaftar (anti enumerasi). Jawab sama seperti pendaftaran baru, dan beri tahu pemilik akun.
+      // Hash sandi tetap dihitung agar waktu jawaban tidak membedakan (#74).
+      await hashPassword(pw, randomHex(16)).catch(() => {})
       await sendEmail(env, email, 'Percobaan pendaftaran di Tongkrongan.tech', '<p>Ada yang mencoba mendaftar dengan email ini, tetapi akun sudah ada. Bila itu kamu, silakan masuk atau atur ulang kata sandi. Bila bukan, abaikan email ini.</p>').catch(() => {})
       return requireVerify(env) ? json({ needVerify: true }) : json({ ok: true })
     }
@@ -265,7 +263,10 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
       await issueOtp(env, { id, email })
       return json({ needVerify: true })
     }
-    return json({ ok: true }, 200, { 'set-cookie': await startSession(req, env, id) })
+    // Tanpa verifikasi email: akun langsung aktif, tetapi sesi tidak diberikan di sini (#74).
+    // Bila email baru mendapat cookie sesi dan email terdaftar tidak, bedanya bisa dipakai memetakan akun.
+    // Pengguna masuk lewat /api/auth/login setelah ini.
+    return json({ ok: true })
   },
 
   'POST /api/auth/login': async (req, env) => {
@@ -374,11 +375,13 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const next = url.searchParams.get('next')
     let dest = '/claim?vercel=1'
     try {
-      // Hanya izinkan host Vercel yang sah. endsWith('vercel.com') saja tidak aman (cocok untuk evil-vercel.com).
+      // Hanya izinkan host Vercel yang sah (#75): vercel.com dan subdomainnya (dikendalikan Vercel).
+      // *.vercel.app dibuang karena siapa pun bisa menerbitkan aplikasi di sana.
+      // endsWith('vercel.com') saja tidak aman (cocok untuk evil-vercel.com).
       if (next) {
         const target = new URL(next)
         const host = target.hostname.toLowerCase()
-        if (target.protocol === 'https:' && (host === 'vercel.com' || host.endsWith('.vercel.com') || host.endsWith('.vercel.app'))) dest = next
+        if (target.protocol === 'https:' && (host === 'vercel.com' || host.endsWith('.vercel.com'))) dest = next
       }
     } catch { /* abaikan */ }
     return new Response(null, { status: 302, headers: { location: dest } })
@@ -475,8 +478,8 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
         else tid = await updateRecord(env, s.txt_record_id, txtHost(env, b.txtLabel, s.name), 'TXT', b.txtValue)
       } else await deleteRecord(env, s.txt_record_id)
     } catch (e) { console.error('updateRecord gagal', s.name, e); throw new HttpError(502, 'dns_provider') }
-    await env.DB.prepare("UPDATE subdomains SET platform = ?, type = ?, value = ?, cf_record_id = ?, txt_label = ?, txt_value = ?, txt_record_id = ?, ownership_token = ?, status = 'pending', fail_reason = NULL, last_check_at = 0 WHERE name = ?")
-      .bind(b.platform, b.type, b.value, rid, b.txtLabel, b.txtValue, tid, randomHex(32), s.name).run()
+    await env.DB.prepare("UPDATE subdomains SET platform = ?, type = ?, value = ?, cf_record_id = ?, txt_label = ?, txt_value = ?, txt_record_id = ?, ownership_token = ?, status = 'pending', fail_reason = NULL, last_check_at = 0, pending_since = ? WHERE name = ?")
+      .bind(b.platform, b.type, b.value, rid, b.txtLabel, b.txtValue, tid, randomHex(32), Date.now(), s.name).run()
     await historyAdd(env, s.name, 'h.edited', `${b.type} ${b.value}`)
     return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
   },
@@ -485,11 +488,13 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     const u = await requireUser(req, env)
     const s = await ownedSub(env, u, m[1])
     if (s.status === 'suspended') throw new HttpError(403, 'suspended')
-    if (Date.now() - s.last_check_at < 8000) throw new HttpError(429, 'too_fast')
-    await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ?').bind(Date.now(), s.name).run()
-    // Subdomain yang DNS-nya dibekukan Cron (takeover): verifikasi mustahil lolos tanpa record, jadi buat ulang dulu,
-    // lalu kembali ke pending agar Cron yang memverifikasi setelah DNS menyebar.
-    if (s.status === 'failed' && s.fail_reason === 'takeover' && !s.cf_record_id) {
+    // Gerbang atomik (#78): UPDATE bersyarat agar dua permintaan verifikasi paralel tidak lolos bersama.
+    const gate = await env.DB.prepare('UPDATE subdomains SET last_check_at = ? WHERE name = ? AND last_check_at < ?').bind(Date.now(), s.name, Date.now() - 8000).run()
+    if (!gate.meta.changes) throw new HttpError(429, 'too_fast')
+    // Subdomain yang DNS-nya dibekukan Cron (takeover) atau gagal diverifikasi ulang setelah edit (unverified):
+    // verifikasi mustahil lolos tanpa record, jadi buat ulang dulu, lalu kembali ke pending agar Cron yang
+    // memverifikasi setelah DNS menyebar.
+    if (s.status === 'failed' && (s.fail_reason === 'takeover' || s.fail_reason === 'unverified') && !s.cf_record_id) {
       let rid: string | null = null
       let tid: string | null = null
       try {
@@ -500,7 +505,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
         await deleteRecord(env, rid).catch(() => {})
         throw new HttpError(502, 'dns_provider')
       }
-      await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0 WHERE name = ?").bind(rid, tid, s.name).run()
+      await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0, pending_since = ? WHERE name = ?").bind(rid, tid, Date.now(), s.name).run()
       await historyAdd(env, s.name, 'h.restored')
       return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
     }
@@ -510,7 +515,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     }
     const r = await verifyRecord(env, s)
     if (r.ok) {
-      const activated = await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?) WHERE name = ? AND ownership_token = ? AND status != 'suspended'").bind(Date.now(), s.name, s.ownership_token).run()
+      const activated = await env.DB.prepare("UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE(activated_at, ?), fail_streak = 0, pending_since = NULL WHERE name = ? AND ownership_token = ? AND status != 'suspended'").bind(Date.now(), s.name, s.ownership_token).run()
       if (!activated.meta.changes) return json({ subdomain: await presentSub(env, await ownedSub(env, u, s.name)) })
       await env.DB.prepare('INSERT INTO checks (name, ok, at) VALUES (?, 1, ?)').bind(s.name, Date.now()).run()
       await historyAdd(env, s.name, 'h.active')
@@ -600,7 +605,7 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
     if (!exists) throw new HttpError(404, 'not_found')
     const id = randomHex(8).toUpperCase()
     await env.DB.prepare('INSERT INTO reports (id, name, reason, detail, ip_hash, at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, name, b.reason, String(b.detail ?? '').slice(0, 600), (await sha256(ip + env.BASE_DOMAIN)).slice(0, 16), Date.now()).run()
+      .bind(id, name, b.reason, String(b.detail ?? '').slice(0, 600), await reportIpHash(env, ip), Date.now()).run()
     return json({ ok: true, id, name })
   },
 }
@@ -608,8 +613,16 @@ const api: Record<string, (req: Request, env: Env, url: URL, m: string[]) => Pro
 /* ---------- admin (token rahasia, belum ada UI) ---------- */
 async function admin(req: Request, env: Env, url: URL): Promise<Response | null> {
   if (!url.pathname.startsWith('/api/admin/')) return null
+  const ip = clientIp(req)
+  // Pembatas laju + kuncian percobaan token (#78): tanpa ini token admin bisa dicoba berulang tanpa hambatan.
+  if (!(await rateLimit(env, `adm:${ip}`, 120, 900))) throw new HttpError(429, 'rate_limited')
+  if ((await ratePeek(env, `admfail:${ip}`, 900)) >= 20) throw new HttpError(429, 'rate_limited')
   const given = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
-  if (!env.ADMIN_TOKEN || !safeEqual(await sha256(given), await sha256(env.ADMIN_TOKEN))) throw new HttpError(401, 'unauthorized')
+  if (!env.ADMIN_TOKEN || !safeEqual(await sha256(given), await sha256(env.ADMIN_TOKEN))) {
+    await rateLimit(env, `admfail:${ip}`, 20, 900)
+    throw new HttpError(401, 'unauthorized')
+  }
+  await rateClear(env, `admfail:${ip}`)
   if (req.method === 'GET' && url.pathname === '/api/admin/reports') {
     const rows = await env.DB.prepare("SELECT * FROM reports WHERE status = 'open' ORDER BY at").all()
     return json({ reports: rows.results })
@@ -669,7 +682,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
     // Menangguhkan status menyembunyikan baris dari aturan itu, jadi tanpa penyesuaian restore akan langsung
     // dilepas lagi pada putaran berikutnya. Untuk yang belum pernah aktif, jendela verifikasi dimulai ulang.
     const windowStart = s.activated_at ? s.created_at : Date.now()
-    await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0, created_at = ? WHERE name = ?").bind(rid, tid, windowStart, s.name).run()
+    await env.DB.prepare("UPDATE subdomains SET status = 'pending', fail_reason = NULL, cf_record_id = ?, txt_record_id = ?, last_check_at = 0, created_at = ?, pending_since = ? WHERE name = ?").bind(rid, tid, windowStart, Date.now(), s.name).run()
     await historyAdd(env, s.name, 'h.restored')
     return json({ ok: true, status: 'pending' })
   }
@@ -730,13 +743,22 @@ async function oauthCallback(req: Request, env: Env, url: URL, provider: OAuthPr
   } catch { return fail('provider') }
   if (!email) return fail('email')
   email = email.toLowerCase()
-  let u = await env.DB.prepare('SELECT id, blocked FROM users WHERE email = ?').bind(email).first<{ id: string; blocked: number }>()
+  let u = await env.DB.prepare('SELECT id, blocked, verified, pw_hash FROM users WHERE email = ?').bind(email).first<{ id: string; blocked: number; verified?: number; pw_hash?: string | null }>()
   if (!u) {
     const id = randomHex(12)
     await env.DB.prepare('INSERT INTO users (id, email, provider, verified, created_at) VALUES (?, ?, ?, 1, ?)').bind(id, email, provider, Date.now()).run()
     u = { id, blocked: 0 }
   }
   if (u.blocked) return fail('blocked')
+  // Anti pre-hijacking (#68): bila akun dibuat dengan sandi dan kepemilikan email belum pernah terbukti
+  // (belum diverifikasi, atau verifikasi email dimatikan), penyerang bisa memegang sandi dan sesi lama.
+  // OAuth sekarang membuktikan pemilik email, jadi sandi dan semua sesi lama dicabut sebelum pemilik masuk.
+  if (u.pw_hash && (!u.verified || !requireVerify(env))) {
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(u.id),
+      env.DB.prepare('UPDATE users SET pw_hash = NULL, pw_salt = NULL, verified = 1 WHERE id = ?').bind(u.id),
+    ])
+  }
   const headers = new Headers({ location: `${url.origin}/dashboard` })
   headers.append('set-cookie', await startSession(req, env, u.id))
   headers.append('set-cookie', cookie(req, 'tt_oauth', '', 0))
@@ -755,7 +777,7 @@ function match(method: string, path: string) {
   return null
 }
 
-async function handleFetch(req: Request, env: Env): Promise<Response> {
+export async function handleFetch(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url)
   if (url.pathname === '/.well-known/security.txt') {
     return new Response(SECURITY_TXT, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } })

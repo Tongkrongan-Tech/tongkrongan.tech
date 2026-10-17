@@ -54,15 +54,7 @@
         ]
       }
     </script>
-    <script>
-      try {
-        var t = localStorage.getItem('tt.theme');
-        var ok = ['light', 'dark', 'kopi', 'mint', 'grape', 'ocean'].indexOf(t) > -1;
-        document.documentElement.dataset.theme = ok ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        var l = localStorage.getItem('tt.lang');
-        if (l) document.documentElement.lang = l;
-      } catch (e) {}
-    </script>
+    <script src="/theme.js"></script>
     <style>html[data-theme="light"]{background:#f4f7fd}html[data-theme="dark"]{background:#0a0e18}html[data-theme="kopi"]{background:#f9f1e4}html[data-theme="mint"]{background:#e8f3e3}html[data-theme="grape"]{background:#f0eafb}html[data-theme="ocean"]{background:#061a33}</style>
   </head>
   <body>

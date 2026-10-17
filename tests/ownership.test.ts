@@ -36,8 +36,8 @@ test('verifikasi membutuhkan token tepat, bukan HTTP sukses atau redirect', asyn
 test('hasil verifikasi lama tidak mengaktifkan record yang diedit, diklaim ulang, atau ditangguhkan', () => {
   const db = new DatabaseSync(':memory:')
   try {
-    db.exec('CREATE TABLE subdomains (name TEXT, ownership_token TEXT, status TEXT, fail_reason TEXT, activated_at INTEGER)')
-    db.exec("INSERT INTO subdomains VALUES ('site', 'new-token', 'pending', NULL, NULL)")
+    db.exec('CREATE TABLE subdomains (name TEXT, ownership_token TEXT, status TEXT, fail_reason TEXT, activated_at INTEGER, fail_streak INTEGER, pending_since INTEGER)')
+    db.exec("INSERT INTO subdomains VALUES ('site', 'new-token', 'pending', NULL, NULL, 0, NULL)")
     for (const file of ['index.ts', 'cron.ts']) {
       const source = readFileSync(new URL(`../worker/${file}`, import.meta.url), 'utf8')
       const sql = source.match(/"(UPDATE subdomains SET status = 'active', fail_reason = NULL, activated_at = COALESCE\(activated_at, \?\)[^"]+)"/)?.[1]

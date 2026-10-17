@@ -1,9 +1,9 @@
 # tongkrongan.tech
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/xyyxzxx/tongkrongan.tech/actions/workflows/ci.yml/badge.svg)](https://github.com/xyyxzxx/tongkrongan.tech/actions/workflows/ci.yml)
+[![CI](https://github.com/Tongkrongan-tech/tongkrongan.tech/actions/workflows/ci.yml/badge.svg)](https://github.com/Tongkrongan-tech/tongkrongan.tech/actions/workflows/ci.yml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Kontributor](https://img.shields.io/github/contributors/xyyxzxx/tongkrongan.tech)](CONTRIBUTORS.md)
+[![Kontributor](https://img.shields.io/github/contributors/Tongkrongan-tech/tongkrongan.tech)](CONTRIBUTORS.md)
 [![Situs](https://img.shields.io/badge/situs-tongkrongan.tech-blue)](https://tongkrongan.tech)
 
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
@@ -70,7 +70,7 @@ Satu Worker Cloudflare menyajikan frontend dan API. Saat pengguna mengklaim nama
 Prasyarat: Node.js 22.6 atau versi lebih baru. Nomor versi yang dipakai CI tertulis di `.nvmrc`.
 
 ```bash
-git clone https://github.com/xyyxzxx/tongkrongan.tech.git
+git clone https://github.com/Tongkrongan-tech/tongkrongan.tech.git
 cd tongkrongan.tech
 npm install
 cp .dev.vars.example .dev.vars
@@ -143,7 +143,7 @@ Ringkasnya:
 
 Terima kasih untuk semua yang sudah membantu project ini. Profil kontributor ada di CONTRIBUTORS.md.
 
-[![Kontributor](https://contrib.rocks/image?repo=xyyxzxx/tongkrongan.tech)](https://github.com/xyyxzxx/tongkrongan.tech/graphs/contributors)
+[![Kontributor](https://contrib.rocks/image?repo=Tongkrongan-tech/tongkrongan.tech)](https://github.com/Tongkrongan-tech/tongkrongan.tech/graphs/contributors)
 
 ## Keamanan
 

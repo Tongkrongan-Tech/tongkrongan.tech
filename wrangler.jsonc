@@ -13,7 +13,7 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "tongkrongan", "database_id": "9d395367-7fcf-4cf2-8b9d-d8edeb3f50de", "migrations_dir": "migrations" }
   ],
-  "workers_dev": true,
+  "workers_dev": false,
   "routes": [{ "pattern": "tongkrongan.tech", "custom_domain": true }],
   "triggers": { "crons": ["*/15 * * * *"] },
   "vars": {
