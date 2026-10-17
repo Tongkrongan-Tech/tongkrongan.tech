@@ -47,6 +47,7 @@ npm run db:remote                       # membuat tabel di D1 produksi
 npx wrangler secret put CF_API_TOKEN    # tempel token dari langkah 2
 npx wrangler secret put CF_ZONE_ID      # tempel Zone ID dari langkah 1
 npx wrangler secret put ADMIN_TOKEN     # string acak panjang buatanmu (untuk API admin)
+npx wrangler secret put REPORT_HASH_KEY # opsional: kunci HMAC untuk menyamarkan IP pelapor di daftar laporan
 ```
 
 ## 5. Deploy
