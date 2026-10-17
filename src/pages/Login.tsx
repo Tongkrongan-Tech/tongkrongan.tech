@@ -81,7 +81,9 @@ export function Login() {
       else if (mode === 'in') { await login(email, pw, captcha); nav(from, { replace: true }) }
       else {
         const r = await signup(email, pw, captcha)
-        if (r.needVerify) { setInfo(t('login.otp.sent')); setCode(''); setMode('otp') } else nav(from, { replace: true })
+        // Tanpa verifikasi email, sesi tidak diberikan langsung dari /signup (#74): arahkan ke masuk
+        // dengan info jelas, sandi yang barusan diisi masih ada di formulir.
+        if (r.needVerify) { setInfo(t('login.otp.sent')); setCode(''); setMode('otp') } else { setInfo(t('login.created')); setMode('in') }
       }
     } catch (ex) {
       if (mode === 'in' && ex instanceof ApiError && ex.code === 'unverified') { setInfo(t('login.otp.sent')); setCode(''); setMode('otp') }

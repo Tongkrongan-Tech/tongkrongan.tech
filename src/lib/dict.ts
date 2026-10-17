@@ -312,6 +312,7 @@ export const dict: Record<string, [string, string]> = {
   'login.oauth': ['Masuk dengan akun lain', 'Log in with another account'],
   'login.verified.1': ['Email terverifikasi. Silakan masuk.', 'Email verified. You can log in now.'],
   'login.verified.0': ['Tautan verifikasi tidak valid atau sudah dipakai.', 'The verification link is invalid or already used.'],
+  'login.created': ['Akun dibuat. Masuk dengan sandi yang baru saja kamu isi.', 'Account created. Log in with the password you just entered.'],
   'pw.show': ['Lihat', 'Show'],
   'pw.hide': ['Sembunyi', 'Hide'],
   'login.otp.h': ['Masukkan kode verifikasi', 'Enter your verification code'],
@@ -353,6 +354,7 @@ export const dict: Record<string, [string, string]> = {
   'val.dns': ['DNS belum menjawab sesuai record. Ini normal di menit-menit awal (propagasi). Pastikan nilai record benar dan tunggu sebentar.', 'DNS has not answered with the record yet. Wait a few minutes for propagation, check the value is right, then try again.'],
   'val.takeover': ['Situsmu berhenti merespons, jadi record DNS-nya kami bekukan demi keamanan (mencegah pengambilalihan subdomain). Perbaiki situs atau tujuan, lalu klik verifikasi untuk memulihkannya.', 'Your site stopped responding, so we froze its DNS records for safety (to prevent subdomain takeover). Fix the site or destination, then click verify to restore it.'],
   'val.down': ['Situsmu berhenti merespons pada beberapa pengecekan berturut-turut. Perbaiki situs atau tujuan, lalu verifikasi ulang.', 'Your site stopped responding on several consecutive checks. Fix the site or destination, then verify again.'],
+  'val.unverified': ['Perubahan pada subdomain ini tidak lolos verifikasi dalam 24 jam, jadi record DNS-nya dibekukan. Perbaiki tujuan atau terbitkan token bukti terbaru di situsmu, lalu klik verifikasi untuk memulihkannya.', 'This subdomain change did not pass verification within 24 hours, so its DNS records were frozen. Fix the destination or publish the latest proof token on your site, then click verify to restore it.'],
   'val.suspended': ['Subdomain ini ditangguhkan karena pelanggaran.', 'This subdomain was suspended for a violation.'],
   // galat dari API
   'err.network': ['Tidak bisa terhubung ke server. Cek koneksi lalu coba lagi.', 'Cannot reach the server. Check your connection and try again.'],
