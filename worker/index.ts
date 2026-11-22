@@ -48,10 +48,37 @@ const reservedExtra = (env: Env) => [env.BASE_DOMAIN.split('.')[0]]
 const sessionName = (req: Request) => new URL(req.url).protocol === 'https:' ? '__Host-tt_session' : 'tt_session'
 const readSession = (req: Request) => readCookie(req, '__Host-tt_session') ?? readCookie(req, 'tt_session')
 
+// Baca body dengan batas byte saat streaming. Jangan memuat body besar lebih dulu
+// hanya untuk menolaknya, dan jangan biarkan JSON null atau array lolos sebagai object.
 async function readBody<T>(req: Request): Promise<T> {
-  const text = await req.text()
-  if (text.length > MAX_BODY) throw new HttpError(413, 'bad_input')
-  try { return JSON.parse(text) as T } catch { throw new HttpError(400, 'bad_json') }
+  const declared = Number(req.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > MAX_BODY) throw new HttpError(413, 'bad_input')
+  const reader = req.body?.getReader()
+  if (!reader) throw new HttpError(400, 'bad_json')
+  const chunks: Uint8Array[] = []
+  let bytes = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      bytes += value.byteLength
+      if (bytes > MAX_BODY) {
+        await reader.cancel().catch(() => {})
+        throw new HttpError(413, 'bad_input')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const body = new Uint8Array(bytes)
+  let offset = 0
+  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength }
+  let parsed: unknown
+  try { parsed = JSON.parse(new TextDecoder().decode(body)) } catch { throw new HttpError(400, 'bad_json') }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new HttpError(400, 'bad_json')
+  return parsed as T
 }
 
 async function currentUser(req: Request, env: Env): Promise<User | null> {
