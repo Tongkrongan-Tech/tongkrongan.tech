@@ -99,19 +99,47 @@ async function historyAdd(env: Env, name: string, key: string, detail?: string) 
   await env.DB.prepare('INSERT INTO history (name, key, detail, at) VALUES (?, ?, ?, ?)').bind(name, key, detail ?? null, Date.now()).run()
 }
 
-async function presentSub(env: Env, s: SubRow) {
-  const [h, c, rated] = await Promise.all([
-    env.DB.prepare('SELECT key, detail, at FROM history WHERE name = ? ORDER BY at DESC, id DESC LIMIT 30').bind(s.name).all<{ key: string; detail: string | null; at: number }>(),
-    env.DB.prepare('SELECT ok FROM checks WHERE name = ? ORDER BY at DESC, id DESC LIMIT 14').bind(s.name).all<{ ok: number }>(),
-    env.DB.prepare('SELECT 1 AS x FROM csat WHERE name = ? AND sub_created = ?').bind(s.name, s.created_at).first(),
+// Sajikan banyak subdomain dengan tiga query, bukan tiga query per subdomain.
+// Daftar dibatasi kuota akun, tetapi pola N+1 tetap terasa saat kuota dinaikkan.
+async function presentSubs(env: Env, subs: SubRow[]) {
+  if (!subs.length) return []
+  const names = subs.map((s) => s.name)
+  const marks = names.map(() => '?').join(',')
+  const [h, c, csat] = await Promise.all([
+    env.DB.prepare(`SELECT name, key, detail, at FROM history WHERE name IN (${marks}) ORDER BY name, at DESC, id DESC`)
+      .bind(...names).all<{ name: string; key: string; detail: string | null; at: number }>(),
+    env.DB.prepare(`SELECT name, ok FROM checks WHERE name IN (${marks}) ORDER BY name, at DESC, id DESC`)
+      .bind(...names).all<{ name: string; ok: number }>(),
+    env.DB.prepare(`SELECT name, sub_created FROM csat WHERE name IN (${marks})`)
+      .bind(...names).all<{ name: string; sub_created: number }>(),
   ])
-  return {
+
+  const history = new Map<string, { at: number; key: string; detail?: string }[]>()
+  for (const x of h.results) {
+    const list = history.get(x.name) ?? []
+    if (list.length < 30) list.push({ at: x.at, key: x.key, detail: x.detail ?? undefined })
+    history.set(x.name, list)
+  }
+  const checks = new Map<string, boolean[]>()
+  for (const x of c.results) {
+    const list = checks.get(x.name) ?? []
+    if (list.length < 14) list.push(!!x.ok)
+    checks.set(x.name, list)
+  }
+  const rated = new Set(csat.results.map((x) => `${x.name}\0${x.sub_created}`))
+
+  return subs.map((s) => ({
     name: s.name, platform: s.platform, type: s.type, value: s.value, status: s.status, failReason: s.fail_reason ?? undefined,
     ownershipToken: s.ownership_token ?? undefined,
-    txtLabel: s.txt_label ?? undefined, txtValue: s.txt_value ?? undefined, createdAt: s.created_at, owned: !!s.activated_at, rated: !!rated,
-    history: h.results.map((x) => ({ at: x.at, key: x.key, detail: x.detail ?? undefined })),
-    checks: c.results.map((x) => !!x.ok).reverse(),
-  }
+    txtLabel: s.txt_label ?? undefined, txtValue: s.txt_value ?? undefined, createdAt: s.created_at, owned: !!s.activated_at,
+    rated: rated.has(`${s.name}\0${s.created_at}`),
+    history: history.get(s.name) ?? [],
+    checks: (checks.get(s.name) ?? []).reverse(),
+  }))
+}
+
+async function presentSub(env: Env, s: SubRow) {
+  return (await presentSubs(env, [s]))[0]
 }
 
 async function ownedSub(env: Env, user: User, name: string) {
@@ -453,7 +481,7 @@ export const api: Record<string, (req: Request, env: Env, url: URL, m: string[])
   'GET /api/subdomains': async (req, env) => {
     const u = await requireUser(req, env)
     const rows = await env.DB.prepare('SELECT * FROM subdomains WHERE user_id = ? ORDER BY created_at').bind(u.id).all<SubRow>()
-    return json({ subdomains: await Promise.all(rows.results.map((r) => presentSub(env, r))), quota: quota(env) })
+    return json({ subdomains: await presentSubs(env, rows.results), quota: quota(env) })
   },
 
   'POST /api/subdomains': async (req, env) => {
