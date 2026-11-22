@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { summarizeFunnel } from '../src/lib/funnel.ts'
+import { medianSeconds, summarizeFunnel } from '../src/lib/funnel.ts'
 
 test('funnel: hitung sesi per langkah, tingkat keberhasilan, dan median waktu', () => {
   const rows = [
@@ -23,6 +23,13 @@ test('funnel kosong tidak membagi nol', () => {
   const f = summarizeFunnel([])
   assert.equal(f.successRate, null)
   assert.equal(f.medianSeconds, null)
+})
+
+test('medianSeconds membuang nilai negatif dan mengurutkan durasi', () => {
+  assert.equal(medianSeconds([]), null)
+  assert.equal(medianSeconds([-1, Number.NaN, 30]), 30)
+  assert.equal(medianSeconds([180, 60]), 120)
+  assert.equal(medianSeconds([180, 60, 90]), 90)
 })
 
 test('endpoint funnel admin dan csat: admin sesudah token, csat wajib login dan hanya subdomain aktif', () => {

@@ -1,7 +1,7 @@
 import { checkName, NAME_RE, suggestCandidates } from '../src/lib/names.ts'
 import { classifyName } from '../src/lib/reserved.ts'
 import { REPORT_REASONS } from '../src/lib/report.ts'
-import { FUNNEL_EVENTS, summarizeFunnel } from '../src/lib/funnel.ts'
+import { FUNNEL_EVENTS, medianSeconds } from '../src/lib/funnel.ts'
 import { PLATFORMS, validateValue, canonicalV6, type RecordType } from '../src/lib/dns.ts'
 import { HttpError, PBKDF2_ITERATIONS, cookie, clientIp, csrfGuard, hashPassword, json, parsePasswordHash, randomHex, rateClear, rateLimit, ratePeek, readCookie, reportIpHash, safeEqual, sendEmail, sha256, verifyTurnstile, type Env } from './lib.ts'
 import { createRecord, deleteRecord, hostOf, txtHost, updateRecord, verifyRecord } from './dns.ts'
@@ -630,9 +630,30 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response | null>
   // Antrean tinjauan: subdomain yang ditandai Cron karena namanya menyerupai merek atau tokoh.
   // Penandaannya tersimpan di history (sekali, tidak pernah dihapus), jadi daftar ini bersifat kumulatif.
   if (req.method === 'GET' && url.pathname === '/api/admin/funnel') {
-    const rows = await env.DB.prepare('SELECT sid, ev, at FROM funnel_events WHERE at > ? ORDER BY at LIMIT 50000').bind(Date.now() - 30 * 86_400_000).all<{ sid: string; ev: string; at: number }>()
-    const c = await env.DB.prepare('SELECT COUNT(*) AS n, AVG(score) AS avg FROM csat').first<{ n: number; avg: number | null }>()
-    return json({ days: 30, ...summarizeFunnel(rows.results), csat: { responses: c?.n ?? 0, average: c?.avg ?? null } })
+    const since = Date.now() - 30 * 86_400_000
+    const events = FUNNEL_EVENTS.map(() => '?').join(',')
+    // Agregasi di SQL agar endpoint tidak menarik sampai 50.000 baris event ke memori Worker.
+    const [sessions, stepRows, successRows, c] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(DISTINCT sid) AS n FROM funnel_events WHERE at > ?').bind(since).first<{ n: number }>(),
+      env.DB.prepare(`SELECT ev, COUNT(DISTINCT sid) AS n FROM funnel_events WHERE at > ? AND ev IN (${events}) GROUP BY ev`)
+        .bind(since, ...FUNNEL_EVENTS).all<{ ev: string; n: number }>(),
+      env.DB.prepare("SELECT MIN(CASE WHEN ev = 'wizard_start' THEN at END) AS started_at, MIN(CASE WHEN ev = 'verify_ok' THEN at END) AS ok_at FROM funnel_events WHERE at > ? GROUP BY sid HAVING started_at IS NOT NULL AND ok_at IS NOT NULL AND ok_at >= started_at")
+        .bind(since).all<{ started_at: number; ok_at: number }>(),
+      env.DB.prepare('SELECT COUNT(*) AS n, AVG(score) AS avg FROM csat').first<{ n: number; avg: number | null }>(),
+    ])
+    const steps = Object.fromEntries(FUNNEL_EVENTS.map((e) => [e, 0])) as Record<(typeof FUNNEL_EVENTS)[number], number>
+    for (const row of stepRows.results) {
+      if ((FUNNEL_EVENTS as readonly string[]).includes(row.ev)) steps[row.ev as keyof typeof steps] = row.n
+    }
+    const median = medianSeconds(successRows.results.map((r) => Math.round((r.ok_at - r.started_at) / 1000)))
+    return json({
+      days: 30,
+      sessions: sessions?.n ?? 0,
+      steps,
+      successRate: steps.wizard_start ? steps.verify_ok / steps.wizard_start : null,
+      medianSeconds: median,
+      csat: { responses: c?.n ?? 0, average: c?.avg ?? null },
+    })
   }
   if (req.method === 'GET' && url.pathname === '/api/admin/reviews') {
     const rows = await env.DB.prepare("SELECT s.name, s.platform, s.type, s.value, s.status, s.activated_at, u.email AS owner_email, u.blocked AS owner_blocked, (SELECT MIN(h.at) FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') AS flagged_at FROM subdomains s JOIN users u ON u.id = s.user_id WHERE EXISTS (SELECT 1 FROM history h WHERE h.name = s.name AND h.key = 'h.needsReview') ORDER BY flagged_at DESC LIMIT 200").all()
