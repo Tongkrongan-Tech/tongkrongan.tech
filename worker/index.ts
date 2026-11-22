@@ -112,9 +112,9 @@ async function presentSubs(env: Env, subs: SubRow[]) {
     const chunk = names.slice(i, i + 50)
     const marks = chunk.map(() => '?').join(',')
     const [h, c, csat] = await Promise.all([
-      env.DB.prepare(`SELECT name, key, detail, at FROM history WHERE name IN (${marks}) ORDER BY name, at DESC, id DESC`)
+      env.DB.prepare(`SELECT name, key, detail, at FROM (SELECT name, key, detail, at, ROW_NUMBER() OVER (PARTITION BY name ORDER BY at DESC, id DESC) AS rn FROM history WHERE name IN (${marks})) WHERE rn <= 30 ORDER BY name, rn`)
         .bind(...chunk).all<{ name: string; key: string; detail: string | null; at: number }>(),
-      env.DB.prepare(`SELECT name, ok FROM checks WHERE name IN (${marks}) ORDER BY name, at DESC, id DESC`)
+      env.DB.prepare(`SELECT name, ok FROM (SELECT name, ok, ROW_NUMBER() OVER (PARTITION BY name ORDER BY at DESC, id DESC) AS rn FROM checks WHERE name IN (${marks})) WHERE rn <= 14 ORDER BY name, rn`)
         .bind(...chunk).all<{ name: string; ok: number }>(),
       env.DB.prepare(`SELECT name, sub_created FROM csat WHERE name IN (${marks})`)
         .bind(...chunk).all<{ name: string; sub_created: number }>(),

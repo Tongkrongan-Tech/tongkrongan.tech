@@ -16,6 +16,8 @@ test('daftar subdomain memakai query batch, bukan N+1', async () => {
     db.prepare("INSERT INTO subdomains (name, user_id, platform, type, value, status, created_at, ownership_token) VALUES ('dua', 'u1', 'vps', 'A', '1.0.0.1', 'pending', ?, 'y')").run(now - 2_000)
     db.prepare("INSERT INTO history (name, key, detail, at) VALUES ('satu', 'h.created', NULL, ?), ('satu', 'h.edited', 'A 1.1.1.1', ?), ('dua', 'h.created', NULL, ?)")
       .run(now - 2_000, now - 1_000, now - 500)
+    const addHistory = db.prepare("INSERT INTO history (name, key, detail, at) VALUES ('satu', 'h.extra', ?, ?)")
+    for (let i = 0; i < 35; i++) addHistory.run(String(i), now - 10_000 + i)
     db.prepare("INSERT INTO checks (name, ok, at) VALUES ('satu', 1, ?), ('satu', 0, ?), ('dua', 1, ?)")
       .run(now - 2_000, now - 1_000, now)
     db.prepare("INSERT INTO csat (name, sub_created, score, at) VALUES ('satu', ?, 5, ?)").run(now - 3_000, now)
@@ -48,7 +50,7 @@ test('daftar subdomain memakai query batch, bukan N+1', async () => {
     assert.deepEqual(satu.checks, [true, false], 'urutan check tetap dari lama ke baru')
     assert.equal(satu.history[0].key, 'h.edited')
     assert.equal(satu.history[0].detail, 'A 1.1.1.1')
-    assert.equal(satu.history.length, 2)
+    assert.equal(satu.history.length, 30, 'riwayat tetap dibatasi 30 per subdomain')
     assert.equal(prepared, 5, 'user, daftar, dan tiga query batch')
   } finally {
     db.close()
