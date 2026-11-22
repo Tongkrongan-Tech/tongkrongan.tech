@@ -37,7 +37,7 @@ export async function runCron(env: Env) {
 
   // 1. Subdomain yang belum pernah aktif dan lewat 24 jam (dihitung dari jendela verifikasi terakhir) dilepas.
   // Record DNS, sambungan domain Vercel, checks, csat, dan riwayatnya ikut dibersihkan (#70, #77).
-  const stale = await env.DB.prepare("SELECT * FROM subdomains WHERE activated_at IS NULL AND status IN ('pending','failed','verifying') AND COALESCE(pending_since, created_at) < ? LIMIT 50").bind(now - DAY).all<Row>()
+  const stale = await env.DB.prepare("SELECT name, user_id, platform, vercel_project, type, value, ownership_token, cf_record_id, txt_record_id, status, created_at, activated_at FROM subdomains WHERE activated_at IS NULL AND status IN ('pending','failed','verifying') AND COALESCE(pending_since, created_at) < ? LIMIT 50").bind(now - DAY).all<Row>()
   for (const s of stale.results) {
     try {
       await deleteRecord(env, s.cf_record_id)
@@ -57,7 +57,7 @@ export async function runCron(env: Env) {
 
   // 2. Coba verifikasi ulang yang masih menunggu. Jendela 24 jam dihitung dari pending_since agar
   // subdomain yang diedit ikut dicek ulang, bukan hanya klaim baru (#70).
-  const waiting = await env.DB.prepare("SELECT * FROM subdomains WHERE status IN ('pending','failed') AND COALESCE(pending_since, created_at) >= ? ORDER BY last_check_at LIMIT 20").bind(now - DAY).all<Row>()
+  const waiting = await env.DB.prepare("SELECT name, user_id, platform, vercel_project, type, value, ownership_token, cf_record_id, txt_record_id, status, created_at, activated_at FROM subdomains WHERE status IN ('pending','failed') AND COALESCE(pending_since, created_at) >= ? ORDER BY last_check_at LIMIT 20").bind(now - DAY).all<Row>()
   for (const s of waiting.results) {
     // Vercel hanya mengecek TXT saat diminta, jadi dorong verifikasinya lagi sekarang setelah DNS menyebar.
     if (s.platform === 'vercel' && s.vercel_project) {
@@ -158,12 +158,25 @@ export async function runCron(env: Env) {
 
   // 6. Tandai nama yang menyerupai merek atau tokoh untuk review manusia (tidak ditolak otomatis).
   // Penanda per-baris `name_checked_at` menggantikan LIMIT 200 tanpa urutan agar semua nama kebagian (#76).
+  // Per nama, dulu ada satu UPDATE, satu SELECT, dan satu INSERT. Sekarang satu UPDATE per 50 nama
+  // dan satu SELECT untuk semua nama yang ditandai, sehingga jumlah query tidak meledak saat antrean penuh.
   const reviewCandidates = await env.DB.prepare("SELECT name FROM subdomains WHERE status IN ('active','pending','failed') AND name_checked_at IS NULL ORDER BY created_at LIMIT 200").all<{ name: string }>()
-  for (const { name } of reviewCandidates.results) {
-    // Klaim dulu supaya tidak diperiksa dua kali bila putaran berikutnya berjalan bersamaan.
-    await env.DB.prepare('UPDATE subdomains SET name_checked_at = ? WHERE name = ? AND name_checked_at IS NULL').bind(now, name).run()
-    if (!classifyName(name).review) continue
-    const already = await env.DB.prepare("SELECT 1 FROM history WHERE name = ? AND key = 'h.needsReview'").bind(name).first()
-    if (!already) await hist(env, name, 'h.needsReview')
+  const reviewNames = reviewCandidates.results.map((x) => x.name)
+  for (let i = 0; i < reviewNames.length; i += 50) {
+    const names = reviewNames.slice(i, i + 50)
+    const marks = names.map(() => '?').join(',')
+    const flagged = names.filter((name) => classifyName(name).review)
+    const already = new Set<string>()
+    if (flagged.length) {
+      const existing = await env.DB.prepare(`SELECT name FROM history WHERE key = 'h.needsReview' AND name IN (${flagged.map(() => '?').join(',')})`)
+        .bind(...flagged).all<{ name: string }>()
+      for (const x of existing.results) already.add(x.name)
+    }
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE subdomains SET name_checked_at = ? WHERE name_checked_at IS NULL AND name IN (${marks})`).bind(now, ...names),
+      ...flagged.filter((name) => !already.has(name)).map((name) =>
+        env.DB.prepare('INSERT INTO history (name, key, detail, at) VALUES (?, ?, ?, ?)').bind(name, 'h.needsReview', null, now),
+      ),
+    ])
   }
 }
