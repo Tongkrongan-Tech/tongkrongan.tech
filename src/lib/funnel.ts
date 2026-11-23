@@ -2,6 +2,13 @@
 export const FUNNEL_EVENTS = ['wizard_start', 'wizard_platform', 'wizard_record', 'verify_ok', 'verify_fail'] as const
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number]
 
+// Median detik dari daftar durasi. Nilai negatif dan bukan angka dibuang.
+export function medianSeconds(values: number[]): number | null {
+  const secs = values.filter((v) => Number.isFinite(v) && v >= 0).sort((x, y) => x - y)
+  const mid = secs.length >> 1
+  return secs.length ? (secs.length % 2 ? secs[mid] : Math.round((secs[mid - 1] + secs[mid]) / 2)) : null
+}
+
 // Ringkas funnel dari baris event: jumlah sesi per langkah, tingkat keberhasilan, dan median detik dari mulai sampai aktif.
 export function summarizeFunnel(rows: { sid: string; ev: string; at: number }[]) {
   const first = new Map<string, Map<string, number>>()
@@ -16,8 +23,5 @@ export function summarizeFunnel(rows: { sid: string; ev: string; at: number }[])
     const a = m.get('wizard_start'), b = m.get('verify_ok')
     if (a !== undefined && b !== undefined && b >= a) secs.push(Math.round((b - a) / 1000))
   }
-  secs.sort((x, y) => x - y)
-  const mid = secs.length >> 1
-  const median = secs.length ? (secs.length % 2 ? secs[mid] : Math.round((secs[mid - 1] + secs[mid]) / 2)) : null
-  return { sessions: first.size, steps, successRate: steps.wizard_start ? steps.verify_ok / steps.wizard_start : null, medianSeconds: median }
+  return { sessions: first.size, steps, successRate: steps.wizard_start ? steps.verify_ok / steps.wizard_start : null, medianSeconds: medianSeconds(secs) }
 }
