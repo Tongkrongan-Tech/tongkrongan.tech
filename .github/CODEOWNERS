@@ -1,16 +1,17 @@
 # Pemilik kode default. Sesuaikan dengan menambahkan @username maintainer per folder.
 # Setiap baris memakai pola CODEOWNERS: pola diikuti satu atau beberapa pemilik.
+# Review dari salah satu pemilik pada baris yang cocok sudah cukup.
 
-* @xyyxzxx
+* @xyyxzxx @Fachryxyf
 
 # Backend
-/worker/ @xyyxzxx
-/migrations/ @xyyxzxx
-/wrangler.jsonc @xyyxzxx
+/worker/ @xyyxzxx @Fachryxyf
+/migrations/ @xyyxzxx @Fachryxyf
+/wrangler.jsonc @xyyxzxx @Fachryxyf
 
 # Frontend
-/src/ @xyyxzxx
+/src/ @xyyxzxx @Fachryxyf
 
 # Dokumentasi dan otomasi
-/.github/ @xyyxzxx
-*.md @xyyxzxx
+/.github/ @xyyxzxx @Fachryxyf
+*.md @xyyxzxx @Fachryxyf

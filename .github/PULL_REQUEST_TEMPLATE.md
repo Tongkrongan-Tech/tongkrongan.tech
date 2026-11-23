@@ -19,6 +19,11 @@ Bila ada perubahan tampilan, tempel tangkapan layar sebelum dan sesudah.
 
 - [ ] Satu pull request untuk satu tujuan
 - [ ] Judul mengikuti Conventional Commits (feat, fix, docs, refactor, chore)
-- [ ] Sudah menjalankan npm run build dan node scripts/contrast.mjs
-- [ ] Dokumentasi diperbarui bila perlu
+- [ ] `npm test` lulus
+- [ ] `npm run build` lulus
+- [ ] `node scripts/contrast.mjs` lulus bila ada perubahan warna atau tema
+- [ ] Perubahan UI dicek di 360px, keyboard, dan tema yang relevan
+- [ ] Migrasi baru diuji dengan `npm run db:local` bila ada perubahan skema
+- [ ] Dokumentasi diperbarui bila perilaku, konfigurasi, atau retensi data berubah
 - [ ] Tidak ada rahasia atau token di dalam perubahan
+- [ ] Perubahan sensitif (auth, cookie, DNS, admin, cron) dijelaskan dampaknya

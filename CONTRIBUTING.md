@@ -54,6 +54,7 @@ Tulis judul dalam kalimat perintah yang singkat, misalnya "fix: tolak IP privat 
 - Isi bagian di template: apa yang berubah, alasannya, cara menguji, dan tangkapan layar bila ada perubahan tampilan.
 - Tandai draft selama masih dikerjakan.
 - Setiap pull request ditinjau minimal satu reviewer selain penulisnya, dengan target review dua sampai tiga hari. Bila lewat batas itu, penulis boleh mengingatkan di channel Discord komunitas.
+- Reviewer mengikuti [panduan code review](docs/engineering/CODE-REVIEW.md), termasuk label temuan, checklist per area, dan kriteria approval.
 - Penulis bertanggung jawab menyelesaikan komentar review.
 
 ## Issue
