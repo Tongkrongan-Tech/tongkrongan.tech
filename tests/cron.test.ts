@@ -190,13 +190,16 @@ test('antrean review nama memakai penanda per-baris, bukan LIMIT tanpa urutan (#
   try {
     seedUser(db, 'u1')
     seedSub(db, { name: 'googl', status: 'active', activated_at: Date.now() - DAY })
+    seedSub(db, { name: 'gogle', status: 'active', activated_at: Date.now() - DAY })
     seedSub(db, { name: 'biasaoke', status: 'active', activated_at: Date.now() - DAY })
     seedSub(db, { name: 'sudahdiperiksa', status: 'active', activated_at: Date.now() - DAY, name_checked_at: 1 })
-    mockFetch(t, { hosts: { 'googl.example.test': { status: 200 }, 'biasaoke.example.test': { status: 200 }, 'sudahdiperiksa.example.test': { status: 200 } } })
+    mockFetch(t, { hosts: { 'googl.example.test': { status: 200 }, 'gogle.example.test': { status: 200 }, 'biasaoke.example.test': { status: 200 }, 'sudahdiperiksa.example.test': { status: 200 } } })
     await runCron(cronEnv(db))
 
     assert.ok(historyKeys(db, 'googl').includes('h.needsReview'), 'nama yang menyerupai merek ditandai')
     assert.equal(db.prepare("SELECT name_checked_at FROM subdomains WHERE name = 'googl'").get().name_checked_at !== null, true)
+    assert.ok(historyKeys(db, 'gogle').includes('h.needsReview'), 'beberapa nama yang ditandai diproses dalam satu batch')
+    assert.equal(db.prepare("SELECT name_checked_at FROM subdomains WHERE name = 'gogle'").get().name_checked_at !== null, true)
     assert.ok(!historyKeys(db, 'biasaoke').includes('h.needsReview'))
     assert.equal(db.prepare("SELECT name_checked_at FROM subdomains WHERE name = 'biasaoke'").get().name_checked_at !== null, true, 'yang sudah diperiksa ikut ditandai agar tidak mengulang antrean')
     assert.equal(db.prepare("SELECT name_checked_at FROM subdomains WHERE name = 'sudahdiperiksa'").get().name_checked_at, 1, 'yang sudah pernah diperiksa tidak disentuh lagi')
